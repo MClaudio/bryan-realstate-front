@@ -83,7 +83,7 @@ export const UserFormPage = () => {
         await api.post('/users', payload);
       }
       toastSuccess('Usuario guardado correctamente');
-      navigate('/usuarios');
+      navigate('/admin/usuarios');
     } catch (error: any) {
       console.error('Error saving user:', error);
       const msg =
@@ -127,7 +127,7 @@ export const UserFormPage = () => {
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => navigate('/usuarios')} className="p-2 hover:bg-gray-100 rounded-full">
+        <button onClick={() => navigate('/admin/usuarios')} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-2xl font-bold text-gray-800">
@@ -292,7 +292,7 @@ export const UserFormPage = () => {
         <div className="flex justify-end gap-4 mt-8 pt-6 border-t">
           <button
             type="button"
-            onClick={() => navigate('/usuarios')}
+            onClick={() => navigate('/admin/usuarios')}
             className="px-4 py-2 text-gray-700 hover:text-gray-900"
           >
             Cancelar

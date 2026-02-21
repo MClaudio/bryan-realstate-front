@@ -12,6 +12,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Building,
+  ClipboardList,
 } from "lucide-react";
 import api from "../../../services/api";
 import { Link } from "react-router-dom";
@@ -154,7 +155,7 @@ export const PropertiesManagementPage = () => {
         </div>
 
         <Link
-          to="/propiedades/nueva"
+          to="/admin/propiedades/nueva"
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
         >
           <Plus size={20} /> Nueva Propiedad
@@ -389,14 +390,21 @@ export const PropertiesManagementPage = () => {
 
                   <div className="flex items-center gap-2">
                     <Link
-                      to={`/propiedades/ver/${property.id}`}
+                      to={`/admin/propiedades/ver/${property.id}`}
                       className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                       title="Ver detalles"
                     >
                       <Eye size={16} />
                     </Link>
                     <Link
-                      to={`/propiedades/editar/${property.id}`}
+                      to={`/admin/propiedades/procesos/${property.id}`}
+                      className="p-2 text-gray-400 hover:text-purple-600 transition-colors"
+                      title="Procesos"
+                    >
+                      <ClipboardList size={16} />
+                    </Link>
+                    <Link
+                      to={`/admin/propiedades/editar/${property.id}`}
                       className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                       title="Editar"
                     >

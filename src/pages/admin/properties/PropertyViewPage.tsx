@@ -1,7 +1,143 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../../services/api';
-import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, Clock, ChevronRight as ChevronRightIcon, DollarSign, FileText, User, Briefcase, X, ClipboardList, Plus } from 'lucide-react';
+
+// ─── Process types ────────────────────────────────────────────────────────────
+interface Expense { amount: number; description: string }
+interface ProcessFile { file: { id: string; originalName: string; path: string; size: number } }
+interface Process {
+  id: string;
+  title: string;
+  type: 'Comprador' | 'Vendedor';
+  description: string;
+  expenses: Expense[];
+  approximateTime?: string;
+  nextStep?: string;
+  createdAt: string;
+  files: ProcessFile[];
+}
+
+// ─── Process Detail Modal ─────────────────────────────────────────────────────
+const ProcessDetailModal = ({ process, onClose }: { process: Process; onClose: () => void }) => {
+  const [fileUrls, setFileUrls] = useState<{ id: string; name: string; url: string }[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      const results = await Promise.all(
+        (process.files || []).map(async (pf) => {
+          try {
+            const r = await api.get(`/files/${pf.file.id}/url`);
+            return { id: pf.file.id, name: pf.file.originalName, url: r.data.url };
+          } catch {
+            return { id: pf.file.id, name: pf.file.originalName, url: '' };
+          }
+        })
+      );
+      setFileUrls(results);
+    };
+    load();
+  }, [process]);
+
+  const expenses: Expense[] = Array.isArray(process.expenses) ? process.expenses : [];
+  const isComprador = process.type === 'Comprador';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-start justify-between p-6 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${isComprador ? 'bg-blue-100' : 'bg-emerald-100'}`}>
+              {isComprador ? <User size={20} className="text-blue-600" /> : <Briefcase size={20} className="text-emerald-600" />}
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">{process.title}</h2>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                isComprador ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+              }`}>{process.type}</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Descripción</h3>
+            <p className="text-gray-800 whitespace-pre-line">{process.description}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {process.approximateTime && (
+              <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-2">
+                <Clock size={16} className="text-gray-500" />
+                <div>
+                  <div className="text-xs text-gray-500">Tiempo Aproximado</div>
+                  <div className="text-sm font-medium">{process.approximateTime}</div>
+                </div>
+              </div>
+            )}
+            {process.nextStep && (
+              <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-2">
+                <ChevronRightIcon size={16} className="text-gray-500" />
+                <div>
+                  <div className="text-xs text-gray-500">Siguiente Paso</div>
+                  <div className="text-sm font-medium">{process.nextStep}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {expenses.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Gastos</h3>
+              <div className="space-y-2">
+                {expenses.map((e, i) => (
+                  <div key={i} className="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-lg px-4 py-2">
+                    <span className="text-sm text-gray-700">{e.description}</span>
+                    <span className="font-semibold text-amber-700">${Number(e.amount).toLocaleString()}</span>
+                  </div>
+                ))}
+                <div className="flex justify-end pt-1">
+                  <span className="text-sm font-bold text-gray-900">
+                    Total: ${expenses.reduce((s, e) => s + Number(e.amount), 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {fileUrls.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Archivos</h3>
+              <div className="space-y-2">
+                {fileUrls.map((f) => (
+                  <div key={f.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <FileText size={16} className="text-gray-500" />
+                      <span className="text-sm text-gray-700 truncate">{f.name}</span>
+                    </div>
+                    {f.url && (
+                      <a href={f.url} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs px-2 py-1 border rounded hover:bg-gray-100 transition-colors">
+                        <Download size={14} /> Descargar
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="text-xs text-gray-400 pt-2">
+            Registrado el {new Date(process.createdAt).toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const PropertyViewPage = () => {
   const { id } = useParams();
@@ -10,16 +146,41 @@ export const PropertyViewPage = () => {
   const [current, setCurrent] = useState(0);
   const [images, setImages] = useState<{ id: string; url: string; name: string }[]>([]);
   const [documents, setDocuments] = useState<{ id: string; name: string; size: number; url: string }[]>([]);
+  const [processes, setProcesses] = useState<Process[]>([]);
+  const [detailProcess, setDetailProcess] = useState<Process | null>(null);
+
+  const extractCoordsFromUrl = (url: string): { lat: number; lng: number } | null => {
+    // For place URLs, use the LAST !3d!4d pair (actual place pin, not viewport or nearby results)
+    const placeMatches = [...url.matchAll(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/g)];
+    if (placeMatches.length > 0) {
+      const last = placeMatches[placeMatches.length - 1];
+      return { lat: parseFloat(last[1]), lng: parseFloat(last[2]) };
+    }
+    // Fall back: simple link patterns
+    const fallback = [
+      /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+    ];
+    for (const p of fallback) {
+      const m = url.match(p);
+      if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+    }
+    return null;
+  };
 
   const buildMapsEmbedUrl = (locUrl?: string, lat?: number, lng?: number) => {
-    if (typeof lat === 'number' && typeof lng === 'number') {
-      return `https://www.google.com/maps?q=${lat},${lng}&hl=es&z=15&output=embed`;
+    // Always prefer coords from locationUrl (source of truth for the exact pin)
+    if (locUrl) {
+      const coords = extractCoordsFromUrl(locUrl);
+      if (coords) return `https://maps.google.com/maps?q=${coords.lat},${coords.lng}&hl=es&z=15&output=embed`;
     }
-    if (locUrl && locUrl.includes('google.com/maps')) {
-      const base = locUrl.split('?')[0];
-      const qs = locUrl.includes('?') ? locUrl.split('?')[1] : '';
-      const url = `${base}?${qs}${qs ? '&' : ''}output=embed`;
-      return url;
+    // Fall back to stored lat/lng (skip 0,0 which is likely an unset default)
+    if (
+      typeof lat === 'number' && !isNaN(lat) && lat !== 0 &&
+      typeof lng === 'number' && !isNaN(lng) && lng !== 0
+    ) {
+      return `https://maps.google.com/maps?q=${lat},${lng}&hl=es&z=15&output=embed`;
     }
     return undefined;
   };
@@ -51,6 +212,11 @@ export const PropertyViewPage = () => {
           }));
           setDocuments(docs);
         }
+        // Fetch processes
+        try {
+          const procRes = await api.get(`/processes?propertyId=${id}`);
+          setProcesses(procRes.data);
+        } catch { /* non-critical */ }
       } catch (e) {
       } finally {
         setLoading(false);
@@ -73,7 +239,7 @@ export const PropertyViewPage = () => {
   return (
     <div className="p-6">
       <div className="flex items-center gap-4 mb-6">
-        <Link to="/propiedades/gestion" className="p-2 hover:bg-gray-100 rounded-full">
+        <Link to="/admin/propiedades/gestion" className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft size={20} />
         </Link>
         <h1 className="text-2xl font-bold text-gray-800">Propiedad {property.code}</h1>
@@ -183,6 +349,97 @@ export const PropertyViewPage = () => {
                 </div>
               )
             )}
+
+            {/* ── Process Timeline ─────────────────────────────────── */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium">Procesos</h3>
+                <Link
+                  to={`/propiedades/procesos/${id}`}
+                  className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  <Plus size={15} /> Nuevo proceso
+                </Link>
+              </div>
+
+              {processes.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <ClipboardList size={32} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-sm text-gray-400">Sin procesos registrados</p>
+                  <Link
+                    to={`/propiedades/procesos/${id}`}
+                    className="inline-flex items-center gap-1 mt-3 text-sm text-blue-600 hover:underline"
+                  >
+                    <Plus size={14} /> Agregar proceso
+                  </Link>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-200" />
+                  <div className="space-y-3">
+                    {processes.map((proc, idx) => {
+                      const expenses: Expense[] = Array.isArray(proc.expenses) ? proc.expenses : [];
+                      const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
+                      const isComprador = proc.type === 'Comprador';
+                      return (
+                        <div key={proc.id} className="relative pl-14">
+                          <div className={`absolute left-3 top-4 w-5 h-5 rounded-full border-2 flex items-center justify-center
+                            ${isComprador ? 'bg-blue-600 border-blue-600' : 'bg-emerald-500 border-emerald-500'}`}>
+                            <span className="text-white text-xs font-bold">{idx + 1}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDetailProcess(proc)}
+                            className="w-full text-left bg-gray-50 hover:bg-white border border-gray-200 hover:border-blue-200 hover:shadow-sm rounded-xl p-4 transition-all group"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                isComprador ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                              }`}>{proc.type}</span>
+                              <h4 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{proc.title}</h4>
+                            </div>
+                            <p className="text-xs text-gray-500 line-clamp-2 mb-2">{proc.description}</p>
+                            <div className="flex flex-wrap gap-2">
+                              {expenses.length > 0 && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full">
+                                  <DollarSign size={11} /> {expenses.length} gasto{expenses.length !== 1 ? 's' : ''} · ${total.toLocaleString()}
+                                </span>
+                              )}
+                              {proc.approximateTime && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                  <Clock size={11} /> {proc.approximateTime}
+                                </span>
+                              )}
+                              {proc.nextStep && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">
+                                  <ChevronRightIcon size={11} /> {proc.nextStep}
+                                </span>
+                              )}
+                              {proc.files?.length > 0 && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                  <FileText size={11} /> {proc.files.length} archivo{proc.files.length !== 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-2 text-xs text-gray-400">
+                              {new Date(proc.createdAt).toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })}
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 text-center">
+                    <Link
+                      to={`/propiedades/procesos/${id}`}
+                      className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      <ClipboardList size={15} /> Ver todos los procesos
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div className="space-y-4">
             <div className="bg-gray-50 rounded-lg p-4">
@@ -221,6 +478,10 @@ export const PropertyViewPage = () => {
           </div>
         </div>
       </div>
+
+      {detailProcess && (
+        <ProcessDetailModal process={detailProcess} onClose={() => setDetailProcess(null)} />
+      )}
     </div>
   );
 };

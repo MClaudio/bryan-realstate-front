@@ -61,7 +61,7 @@ export const ClientsManagementPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Gestión de Clientes</h1>
         <Link 
-          to="/clientes/nuevo" 
+          to="/admin/clientes/nuevo" 
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <Plus size={20} /> Nuevo Cliente
@@ -133,7 +133,7 @@ export const ClientsManagementPage = () => {
                       </span>
                     </td>
                     <td className="p-4 text-right space-x-2">
-                      <Link to={`/clientes/editar/${client.id}`} className="text-blue-500 hover:text-blue-700 inline-block" title="Editar">
+                      <Link to={`/admin/clientes/editar/${client.id}`} className="text-blue-500 hover:text-blue-700 inline-block" title="Editar">
                         <Edit size={18} />
                       </Link>
                       <button 

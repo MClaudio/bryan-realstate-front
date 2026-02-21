@@ -8,15 +8,38 @@ export const PropertyDetailPage = () => {
   const [property, setProperty] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [current, setCurrent] = useState(0)
-  const buildMapsEmbedUrl = (locUrl?: string, lat?: number, lng?: number) => {
-    if (typeof lat === 'number' && typeof lng === 'number') {
-      return `https://www.google.com/maps?q=${lat},${lng}&hl=es&z=15&output=embed`
+  const extractCoordsFromUrl = (url: string): { lat: number; lng: number } | null => {
+    // For place URLs, use the LAST !3d!4d pair (actual place pin, not viewport or nearby results)
+    const placeMatches = [...url.matchAll(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/g)]
+    if (placeMatches.length > 0) {
+      const last = placeMatches[placeMatches.length - 1]
+      return { lat: parseFloat(last[1]), lng: parseFloat(last[2]) }
     }
-    if (locUrl && locUrl.includes('google.com/maps')) {
-      const base = locUrl.split('?')[0]
-      const qs = locUrl.includes('?') ? locUrl.split('?')[1] : ''
-      const url = `${base}?${qs}${qs ? '&' : ''}output=embed`
-      return url
+    // Fall back: simple link patterns
+    const fallback = [
+      /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+    ]
+    for (const p of fallback) {
+      const m = url.match(p)
+      if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) }
+    }
+    return null
+  }
+
+  const buildMapsEmbedUrl = (locUrl?: string, lat?: number, lng?: number) => {
+    // Always prefer coords from locationUrl (source of truth for the exact pin)
+    if (locUrl) {
+      const coords = extractCoordsFromUrl(locUrl)
+      if (coords) return `https://maps.google.com/maps?q=${coords.lat},${coords.lng}&hl=es&z=15&output=embed`
+    }
+    // Fall back to stored lat/lng (skip 0,0 which is likely an unset default)
+    if (
+      typeof lat === 'number' && !isNaN(lat) && lat !== 0 &&
+      typeof lng === 'number' && !isNaN(lng) && lng !== 0
+    ) {
+      return `https://maps.google.com/maps?q=${lat},${lng}&hl=es&z=15&output=embed`
     }
     return undefined
   }

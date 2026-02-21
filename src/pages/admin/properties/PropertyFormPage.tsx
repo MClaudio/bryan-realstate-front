@@ -90,9 +90,36 @@ export const PropertyFormPage = () => {
       facebookUrl: '',
       tiktokUrl: '',
       instagramUrl: '',
-      youtubeUrl: ''
+      youtubeUrl: '',
+      locationUrl: ''
     }
   });
+
+  const extractCoordsFromGoogleMapsUrl = useCallback((url: string) => {
+    if (!url) return;
+    // For place URLs, !3d!4d pairs appear for each result; the LAST one is the target place pin.
+    const placeMatches = [...url.matchAll(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/g)];
+    if (placeMatches.length > 0) {
+      const last = placeMatches[placeMatches.length - 1];
+      setValue('latitude', last[1], { shouldValidate: true });
+      setValue('longitude', last[2], { shouldValidate: true });
+      return;
+    }
+    // Fall back: simple map link patterns
+    const fallbackPatterns = [
+      /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+    ];
+    for (const pattern of fallbackPatterns) {
+      const match = url.match(pattern);
+      if (match) {
+        setValue('latitude', match[1], { shouldValidate: true });
+        setValue('longitude', match[2], { shouldValidate: true });
+        return;
+      }
+    }
+  }, [setValue]);
 
   const fetchAdvisors = useCallback(async () => {
     try {
@@ -167,7 +194,8 @@ export const PropertyFormPage = () => {
           facebookUrl: propertyData.facebookUrl || '',
           tiktokUrl: propertyData.tiktokUrl || '',
           instagramUrl: propertyData.instagramUrl || '',
-          youtubeUrl: propertyData.youtubeUrl || ''
+          youtubeUrl: propertyData.youtubeUrl || '',
+          locationUrl: propertyData.locationUrl || ''
         });
 
         setShowBasicServices(propertyData.hasBasicServices);
@@ -271,7 +299,7 @@ export const PropertyFormPage = () => {
         toastSuccess('Propiedad creada exitosamente');
       }
       
-      navigate('/propiedades/gestion');
+      navigate('/admin/propiedades/gestion');
     } catch (error: any) {
       console.error('Error saving property:', error);
       const message = error.response?.data?.message || 'Error al guardar la propiedad';
@@ -347,7 +375,7 @@ export const PropertyFormPage = () => {
     return (
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => navigate('/propiedades/gestion')} className="p-2 hover:bg-gray-100 rounded-full">
+          <button onClick={() => navigate('/admin/propiedades/gestion')} className="p-2 hover:bg-gray-100 rounded-full">
             <ArrowLeft size={20} />
           </button>
           <h1 className="text-2xl font-bold text-gray-800">
@@ -369,7 +397,7 @@ export const PropertyFormPage = () => {
     return (
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => navigate('/propiedades/gestion')} className="p-2 hover:bg-gray-100 rounded-full">
+          <button onClick={() => navigate('/admin/propiedades/gestion')} className="p-2 hover:bg-gray-100 rounded-full">
             <ArrowLeft size={20} />
           </button>
           <h1 className="text-2xl font-bold text-gray-800">
@@ -394,7 +422,7 @@ export const PropertyFormPage = () => {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => navigate('/propiedades/gestion')} className="p-2 hover:bg-gray-100 rounded-full">
+        <button onClick={() => navigate('/admin/propiedades/gestion')} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-2xl font-bold text-gray-800">
@@ -537,6 +565,22 @@ export const PropertyFormPage = () => {
         {/* Location Tab */}
         <div className={activeTab === 'location' ? 'block' : 'hidden'}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">URL de Google Maps *</label>
+              <input
+                type="url"
+                {...register('locationUrl', { required: 'La URL de Google Maps es requerida' })}
+                onChange={(e) => {
+                  register('locationUrl').onChange(e);
+                  extractCoordsFromGoogleMapsUrl(e.target.value);
+                }}
+                className={`w-full p-2 border rounded-md ${errors.locationUrl ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+                placeholder="https://www.google.com/maps/@-2.1234,-78.5678,15z"
+              />
+              {errors.locationUrl && <span className="text-red-500 text-xs">{errors.locationUrl.message as string}</span>}
+              <p className="text-xs text-gray-500 mt-1">Al pegar la URL se extraerán automáticamente la latitud y longitud.</p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Área de Construcción (m²)</label>
               <input

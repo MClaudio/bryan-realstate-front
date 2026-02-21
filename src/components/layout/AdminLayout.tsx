@@ -60,16 +60,16 @@ export const AdminLayout = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/admin/login');
   };
 
   const menuItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/usuarios', icon: Users, label: 'Usuarios', allowed: ['ADMIN'] },
-    { path: '/clientes', icon: UserCheck, label: 'Clientes' },
-    { path: '/propiedades/gestion', icon: Building2, label: 'Propiedades' },
-    { path: '/archivos', icon: FolderOpen, label: 'Archivos' },
-    { path: '/configuracion', icon: Settings, label: 'Configuración' },
+    { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/admin/usuarios', icon: Users, label: 'Usuarios', allowed: ['ADMIN'] },
+    { path: '/admin/clientes', icon: UserCheck, label: 'Clientes' },
+    { path: '/admin/propiedades/gestion', icon: Building2, label: 'Propiedades' },
+    { path: '/admin/archivos', icon: FolderOpen, label: 'Archivos' },
+    { path: '/admin/configuracion', icon: Settings, label: 'Configuración' },
   ];
 
   const filteredMenuItems = menuItems.filter(item => 
@@ -99,7 +99,7 @@ export const AdminLayout = () => {
       `}>
         {/* Logo and Toggle */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <Link to="/dashboard" className={`flex items-center gap-2 ${!isSidebarOpen && !isMobile ? 'hidden' : 'flex'}`}>
+          <Link to="/admin/dashboard" className={`flex items-center gap-2 ${!isSidebarOpen && !isMobile ? 'hidden' : 'flex'}`}>
             <Home className="w-6 h-6 text-blue-600" />
             <span className="font-bold text-lg text-gray-800">Bryan RealState</span>
           </Link>

@@ -24,7 +24,7 @@ export const LoginPage = () => {
       toastSuccess(`Bienvenido, ${user.firstName}`);
       
       // Redirect based on user role or first login
-      navigate('/dashboard');
+      navigate('/admin/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al iniciar sesión');
       alertError('Inicio de sesión fallido', err.response?.data?.message || 'Verifica tus credenciales');

@@ -18,7 +18,7 @@ export const ResetPasswordPage = () => {
   useEffect(() => {
     if (!token) {
       alertError('Error', 'Token inválido o no proporcionado');
-      navigate('/login');
+      navigate('/admin/login');
     }
   }, [token, navigate]);
 
@@ -31,7 +31,7 @@ export const ResetPasswordPage = () => {
       });
       setSuccess(true);
       toastSuccess('Contraseña actualizada exitosamente');
-      setTimeout(() => navigate('/login'), 3000);
+      setTimeout(() => navigate('/admin/login'), 3000);
     } catch (err: any) {
       alertError('Error', err.response?.data?.message || 'No se pudo restablecer la contraseña');
     } finally {
@@ -54,7 +54,7 @@ export const ResetPasswordPage = () => {
               Tu contraseña ha sido actualizada exitosamente. Serás redirigido al inicio de sesión...
             </p>
             <Link
-              to="/login"
+              to="/admin/login"
               className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors"
             >
               Ir al inicio de sesión
@@ -188,7 +188,7 @@ export const ResetPasswordPage = () => {
           {/* Back to Login */}
           <div className="mt-6 text-center">
             <Link
-              to="/login"
+              to="/admin/login"
               className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />

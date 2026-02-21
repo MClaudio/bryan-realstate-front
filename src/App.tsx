@@ -18,6 +18,7 @@ import { DashboardPage } from './pages/admin/DashboardPage';
 import { PropertiesManagementPage } from './pages/admin/properties/PropertiesManagementPage';
 import { PropertyFormPage } from './pages/admin/properties/PropertyFormPage';
 import { PropertyViewPage } from './pages/admin/properties/PropertyViewPage';
+import { ProcessesPage } from './pages/admin/processes/ProcessesPage';
 import { UsersManagementPage } from './pages/admin/users/UsersManagementPage';
 import { UserFormPage } from './pages/admin/users/UserFormPage';
 import { ClientsManagementPage } from './pages/admin/clients/ClientsManagementPage';
@@ -32,38 +33,41 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route element={<PublicLayout />}>
-            {/* <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<HomePage />} />
             <Route path="/propiedades" element={<PropertiesPage />} />
             <Route path="/propiedades/:id" element={<PropertyDetailPage />} />
-            <Route path="/contacto" element={<ContactPage />} /> */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/contacto" element={<ContactPage />} />
           </Route>
 
-          {/* Protected Routes */}
+          {/* Admin Auth Routes (no layout) */}
+          <Route path="/admin/login" element={<LoginPage />} />
+          <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
+
+          {/* Protected Admin Routes */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AdminLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/admin/dashboard" element={<DashboardPage />} />
               
               {/* Users Management Routes */}
-              <Route path="/usuarios" element={<UsersManagementPage />} />
-              <Route path="/usuarios/nuevo" element={<UserFormPage />} />
-              <Route path="/usuarios/editar/:id" element={<UserFormPage />} />
+              <Route path="/admin/usuarios" element={<UsersManagementPage />} />
+              <Route path="/admin/usuarios/nuevo" element={<UserFormPage />} />
+              <Route path="/admin/usuarios/editar/:id" element={<UserFormPage />} />
 
               {/* Clients Management Routes */}
-              <Route path="/clientes" element={<ClientsManagementPage />} />
-              <Route path="/clientes/nuevo" element={<ClientFormPage />} />
-              <Route path="/clientes/editar/:id" element={<ClientFormPage />} />
+              <Route path="/admin/clientes" element={<ClientsManagementPage />} />
+              <Route path="/admin/clientes/nuevo" element={<ClientFormPage />} />
+              <Route path="/admin/clientes/editar/:id" element={<ClientFormPage />} />
               
               {/* Properties Management Routes */}
-              <Route path="/propiedades/gestion" element={<PropertiesManagementPage />} />
-              <Route path="/propiedades/nueva" element={<PropertyFormPage />} />
-              <Route path="/propiedades/editar/:id" element={<PropertyFormPage />} />
-              <Route path="/propiedades/ver/:id" element={<PropertyViewPage />} />
+              <Route path="/admin/propiedades/gestion" element={<PropertiesManagementPage />} />
+              <Route path="/admin/propiedades/nueva" element={<PropertyFormPage />} />
+              <Route path="/admin/propiedades/editar/:id" element={<PropertyFormPage />} />
+              <Route path="/admin/propiedades/ver/:id" element={<PropertyViewPage />} />
+              <Route path="/admin/propiedades/procesos/:propertyId" element={<ProcessesPage />} />
               
-              <Route path="/archivos" element={<FilesManagementPage />} />
-              <Route path="/configuracion" element={<ConfigurationPage />} />
+              <Route path="/admin/archivos" element={<FilesManagementPage />} />
+              <Route path="/admin/configuracion" element={<ConfigurationPage />} />
             </Route>
           </Route>
 

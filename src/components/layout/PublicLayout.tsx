@@ -23,7 +23,7 @@ export const PublicLayout = () => {
             <Link to="/contacto" className="text-gray-600 hover:text-blue-600 flex items-center gap-2">
               <Phone size={20} /> Contacto
             </Link>
-            <Link to="/login" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+            <Link to="/admin/login" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
               <User size={20} /> Login
             </Link>
           </div>
@@ -48,7 +48,7 @@ export const PublicLayout = () => {
             <Link to="/contacto" className="block text-gray-600 hover:text-blue-600" onClick={() => setIsMenuOpen(false)}>
               Contacto
             </Link>
-            <Link to="/login" className="block text-blue-600 font-semibold" onClick={() => setIsMenuOpen(false)}>
+            <Link to="/admin/login" className="block text-blue-600 font-semibold" onClick={() => setIsMenuOpen(false)}>
               Login
             </Link>
           </div>

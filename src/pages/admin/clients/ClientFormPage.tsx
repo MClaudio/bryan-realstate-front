@@ -89,7 +89,7 @@ export const ClientFormPage = () => {
         await api.post('/clients', payload);
       }
       toastSuccess('Cliente guardado correctamente');
-      navigate('/clientes');
+      navigate('/admin/clientes');
     } catch (error: any) {
       console.error('Error saving client:', error);
       const msg =
@@ -104,7 +104,7 @@ export const ClientFormPage = () => {
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => navigate('/clientes')} className="p-2 hover:bg-gray-100 rounded-full">
+        <button onClick={() => navigate('/admin/clientes')} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-2xl font-bold text-gray-800">
@@ -221,7 +221,7 @@ export const ClientFormPage = () => {
         <div className="flex justify-end gap-4 mt-8 pt-6 border-t">
           <button
             type="button"
-            onClick={() => navigate('/clientes')}
+            onClick={() => navigate('/admin/clientes')}
             className="px-4 py-2 text-gray-700 hover:text-gray-900"
           >
             Cancelar
