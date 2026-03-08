@@ -14,6 +14,7 @@ export const UserFormPage = () => {
   const isAdmin = currentUser?.type === 'ADMIN';
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isActive, setIsActive] = useState(true);
   
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: {
@@ -48,6 +49,7 @@ export const UserFormPage = () => {
             type: userData.type ?? 'EMPLOYEE',
           };
           reset(allowed);
+          setIsActive(userData.isActive ?? true);
         } catch (error) {
           console.error('Error fetching user:', error);
         }
@@ -81,7 +83,7 @@ export const UserFormPage = () => {
       }
 
       if (isEditMode) {
-        await api.patch(`/users/${id}`, payload);
+        await api.patch(`/users/${id}`, { ...payload, isActive });
       } else {
         await api.post('/users', payload);
       }
@@ -197,6 +199,30 @@ export const UserFormPage = () => {
               <option value="ADMIN">Administrador</option>
             </select>
           </div>
+
+          {isEditMode && (
+            <div className="flex items-center gap-3">
+              <label className="block text-sm font-medium text-gray-700">Estado</label>
+              <button
+                type="button"
+                onClick={() => setIsActive(!isActive)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  isActive ? 'bg-green-500' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    isActive ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className={`text-sm font-medium ${
+                isActive ? 'text-green-600' : 'text-gray-400'
+              }`}>
+                {isActive ? 'Activo' : 'Inactivo'}
+              </span>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">RUC *</label>
