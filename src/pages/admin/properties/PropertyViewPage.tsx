@@ -584,7 +584,7 @@ export const PropertyViewPage = () => {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium">Procesos</h3>
                 <Link
-                  to={`/propiedades/procesos/${id}`}
+                  to={`/admin/propiedades/procesos/${id}`}
                   className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
                 >
                   <Plus size={15} /> Nuevo proceso
@@ -596,7 +596,7 @@ export const PropertyViewPage = () => {
                   <ClipboardList size={32} className="mx-auto text-gray-300 mb-2" />
                   <p className="text-sm text-gray-400">Sin procesos registrados</p>
                   <Link
-                    to={`/propiedades/procesos/${id}`}
+                    to={`/admin/propiedades/procesos/${id}`}
                     className="inline-flex items-center gap-1 mt-3 text-sm text-blue-600 hover:underline"
                   >
                     <Plus size={14} /> Agregar proceso
@@ -660,7 +660,7 @@ export const PropertyViewPage = () => {
                   </div>
                   <div className="mt-4 text-center">
                     <Link
-                      to={`/propiedades/procesos/${id}`}
+                      to={`/admin/propiedades/procesos/${id}`}
                       className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
                     >
                       <ClipboardList size={15} /> Ver todos los procesos
