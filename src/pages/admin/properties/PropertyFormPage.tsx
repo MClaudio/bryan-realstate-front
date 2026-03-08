@@ -46,7 +46,7 @@ export const PropertyFormPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [property, setProperty] = useState<Property | null>(null);
+  const [_property, setProperty] = useState<Property | null>(null);
   const [fileIds, setFileIds] = useState<string[]>([]);
   const [documentFileIds, setDocumentFileIds] = useState<string[]>([]);
   const [initialImageFiles, setInitialImageFiles] = useState<{ id: string; url: string; name: string; size?: number }[]>([]);

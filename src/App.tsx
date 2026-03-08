@@ -5,13 +5,9 @@ import { AdminLayout } from './components/layout/AdminLayout';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 
 // Public Pages
-import { HomePage } from './pages/public/HomePage';
-import { PropertiesPage } from './pages/public/PropertiesPage';
-import { ContactPage } from './pages/public/ContactPage';
 import { LoginPage } from './pages/public/LoginPage';
 import { ForgotPasswordPage } from './pages/public/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/public/ResetPasswordPage';
-import { PropertyDetailPage } from './pages/public/PropertyDetailPage';
 
 // Admin Pages
 import { DashboardPage } from './pages/admin/DashboardPage';
