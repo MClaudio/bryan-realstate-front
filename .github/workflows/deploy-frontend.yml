@@ -5,15 +5,12 @@ on:
     branches:
       - main
     paths:
-      - "frontend/**"
+      - "**"
       - ".github/workflows/deploy-frontend.yml"
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
 
     steps:
       - name: Checkout repository
@@ -45,7 +42,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/
+          path: dist/
           retention-days: 7
 
       - name: Commit and push built files
