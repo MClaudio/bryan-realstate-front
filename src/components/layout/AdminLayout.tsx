@@ -12,7 +12,8 @@ import {
   X,
   Bell,
   ChevronDown,
-  Home
+  Home,
+  ShieldX
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
@@ -69,6 +70,7 @@ export const AdminLayout = () => {
     { path: '/admin/clientes', icon: UserCheck, label: 'Clientes' },
     { path: '/admin/propiedades/gestion', icon: Building2, label: 'Propiedades' },
     { path: '/admin/archivos', icon: FolderOpen, label: 'Archivos' },
+    { path: '/admin/lista-negra', icon: ShieldX, label: 'Lista Negra' },
     { path: '/admin/configuracion', icon: Settings, label: 'Configuración' },
   ];
 
