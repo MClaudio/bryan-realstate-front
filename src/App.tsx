@@ -23,6 +23,7 @@ import { ConfigurationPage } from './pages/admin/configuration/ConfigurationPage
 import { FilesManagementPage } from './pages/admin/files/FilesManagementPage';
 import { BlacklistManagementPage } from './pages/admin/blacklist/BlacklistManagementPage';
 import { BlacklistFormPage } from './pages/admin/blacklist/BlacklistFormPage';
+import { ProfilePage } from './pages/admin/ProfilePage';
 
 function App() {
   return (
@@ -71,6 +72,9 @@ function App() {
               <Route path="/admin/lista-negra" element={<BlacklistManagementPage />} />
               <Route path="/admin/lista-negra/nuevo" element={<BlacklistFormPage />} />
               <Route path="/admin/lista-negra/editar/:id" element={<BlacklistFormPage />} />
+
+              {/* Profile Route */}
+              <Route path="/admin/mi-perfil" element={<ProfilePage />} />
             </Route>
           </Route>
 
