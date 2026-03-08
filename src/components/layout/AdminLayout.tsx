@@ -13,7 +13,8 @@ import {
   Bell,
   ChevronDown,
   Home,
-  ShieldX
+  ShieldX,
+  UserCircle
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
@@ -170,6 +171,15 @@ export const AdminLayout = () => {
                   ? 'bottom-0 left-full ml-2 w-48'
                   : 'bottom-full left-0 right-0 mb-2'
               }`}>
+                <Link
+                  to="/admin/mi-perfil"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-3 w-full px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <UserCircle className="w-4 h-4 shrink-0" />
+                  <span>Mi Perfil</span>
+                </Link>
+                <div className="border-t border-gray-100 my-1" />
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-3 w-full px-4 py-2 text-red-600 hover:bg-red-50 transition-colors"

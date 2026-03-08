@@ -4,11 +4,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../../services/api';
 import { Save, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { alertError, toastSuccess } from '../../../utils/alerts';
+import { useAuth } from '../../../context/AuthContext';
 
 export const UserFormPage = () => {
   const { id } = useParams();
   const isEditMode = !!id;
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.type === 'ADMIN';
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
@@ -110,10 +113,11 @@ export const UserFormPage = () => {
       return;
     }
     try {
-      await api.patch(`/users/${id}/password`, {
-        currentPassword,
-        newPassword,
-      });
+      const payload: any = { newPassword };
+      if (!isAdmin) {
+        payload.currentPassword = currentPassword;
+      }
+      await api.patch(`/users/${id}/password`, payload);
       toastSuccess('Contraseña actualizada');
       setCurrentPassword('');
       setNewPassword('');
@@ -255,13 +259,15 @@ export const UserFormPage = () => {
               ) : (
                 <>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Cambiar Contraseña</label>
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Contraseña actual"
-                    className="w-full p-2 border rounded-md mb-2"
-                  />
+                  {!isAdmin && (
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Contraseña actual"
+                      className="w-full p-2 border rounded-md mb-2"
+                    />
+                  )}
                   <input
                     type="password"
                     value={newPassword}
