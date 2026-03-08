@@ -1,7 +1,133 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../../services/api';
-import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, Clock, ChevronRight as ChevronRightIcon, DollarSign, FileText, User, Briefcase, X, ClipboardList, Plus } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, Clock, ChevronRight as ChevronRightIcon, DollarSign, FileText, User, Briefcase, X, ClipboardList, Plus, Heart, Trash2, Star } from 'lucide-react';
+
+// ─── Interest types ──────────────────────────────────────────────────────────
+type InterestLevel = 'Bajo' | 'Medio' | 'Alto' | 'MuyAlto';
+const INTEREST_LEVELS: { value: InterestLevel; label: string; color: string; stars: number }[] = [
+  { value: 'Bajo',    label: 'Bajo',     color: 'bg-gray-100 text-gray-600',    stars: 1 },
+  { value: 'Medio',   label: 'Medio',    color: 'bg-yellow-100 text-yellow-700', stars: 2 },
+  { value: 'Alto',    label: 'Alto',     color: 'bg-orange-100 text-orange-700', stars: 3 },
+  { value: 'MuyAlto', label: 'Muy Alto', color: 'bg-red-100 text-red-700',       stars: 4 },
+];
+interface ClientSummary { id: string; firstName: string; lastName: string; email?: string; phone: string }
+interface PropertyInterest {
+  id: string;
+  interestDate: string;
+  interestLevel: InterestLevel;
+  notes?: string;
+  client: ClientSummary;
+}
+
+// ─── Interest Form Modal ──────────────────────────────────────────────────────
+const InterestFormModal = ({
+  propertyId, clients, onClose, onSaved,
+}: {
+  propertyId: string;
+  clients: ClientSummary[];
+  onClose: () => void;
+  onSaved: (item: PropertyInterest) => void;
+}) => {
+  const today = new Date().toISOString().split('T')[0];
+  const [clientId, setClientId] = useState('');
+  const [interestDate, setInterestDate] = useState(today);
+  const [interestLevel, setInterestLevel] = useState<InterestLevel>('Medio');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientId) { setError('Seleccione un cliente'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await api.post('/property-interests', { propertyId, clientId, interestDate, interestLevel, notes: notes || undefined });
+      onSaved(res.data);
+      onClose();
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? 'Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-full bg-pink-100"><Heart size={18} className="text-pink-600" /></div>
+            <h2 className="text-lg font-bold text-gray-900">Registrar Interés</h2>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
+            <select
+              value={clientId}
+              onChange={e => setClientId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+              required
+            >
+              <option value="">Seleccionar cliente...</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>{c.firstName} {c.lastName} — {c.phone}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
+              <input
+                type="date"
+                value={interestDate}
+                onChange={e => setInterestDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de Interés *</label>
+              <select
+                value={interestLevel}
+                onChange={e => setInterestLevel(e.target.value as InterestLevel)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+              >
+                {INTEREST_LEVELS.map(l => (
+                  <option key={l.value} value={l.value}>{l.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 resize-none"
+              placeholder="Observaciones sobre el interés del cliente..."
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 text-sm bg-pink-600 text-white rounded-lg hover:bg-pink-700 disabled:opacity-50"
+            >
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 // ─── Process types ────────────────────────────────────────────────────────────
 interface Expense { amount: number; description: string }
@@ -148,6 +274,10 @@ export const PropertyViewPage = () => {
   const [documents, setDocuments] = useState<{ id: string; name: string; size: number; url: string }[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
   const [detailProcess, setDetailProcess] = useState<Process | null>(null);
+  const [interests, setInterests] = useState<PropertyInterest[]>([]);
+  const [clients, setClients] = useState<ClientSummary[]>([]);
+  const [showInterestForm, setShowInterestForm] = useState(false);
+  const [deletingInterestId, setDeletingInterestId] = useState<string | null>(null);
 
   const extractCoordsFromUrl = (url: string): { lat: number; lng: number } | null => {
     // For place URLs, use the LAST !3d!4d pair (actual place pin, not viewport or nearby results)
@@ -217,6 +347,11 @@ export const PropertyViewPage = () => {
           const procRes = await api.get(`/processes?propertyId=${id}`);
           setProcesses(procRes.data);
         } catch { /* non-critical */ }
+        // Fetch interests
+        try {
+          const intRes = await api.get(`/property-interests?propertyId=${id}`);
+          setInterests(intRes.data);
+        } catch { /* non-critical */ }
       } catch (e) {
       } finally {
         setLoading(false);
@@ -232,6 +367,24 @@ export const PropertyViewPage = () => {
 
   const prev = () => setCurrent((c) => (images.length ? (c - 1 + images.length) % images.length : 0));
   const next = () => setCurrent((c) => (images.length ? (c + 1) % images.length : 0));
+
+  const loadClients = async () => {
+    if (clients.length > 0) return;
+    try {
+      const res = await api.get('/clients');
+      setClients(res.data.map((c: any) => ({ id: c.id, firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone })));
+    } catch { /* non-critical */ }
+  };
+
+  const handleDeleteInterest = async (iid: string) => {
+    setDeletingInterestId(iid);
+    try {
+      await api.delete(`/property-interests/${iid}`);
+      setInterests(prev => prev.filter(i => i.id !== iid));
+    } catch { /* non-critical */ } finally {
+      setDeletingInterestId(null);
+    }
+  };
 
   if (loading) return <div className="p-8">Cargando...</div>;
   if (!property) return <div className="p-8">Propiedad no encontrada</div>;
@@ -349,6 +502,82 @@ export const PropertyViewPage = () => {
                 </div>
               )
             )}
+
+            {/* ── Interested Clients ───────────────────────────────── */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium flex items-center gap-2">
+                  <Heart size={18} className="text-pink-500" /> Clientes Interesados
+                  {interests.length > 0 && (
+                    <span className="ml-1 text-sm font-normal text-gray-400">({interests.length})</span>
+                  )}
+                </h3>
+                <button
+                  onClick={() => { loadClients(); setShowInterestForm(true); }}
+                  className="inline-flex items-center gap-1.5 text-sm text-pink-600 hover:text-pink-700 font-medium"
+                >
+                  <Plus size={15} /> Registrar interés
+                </button>
+              </div>
+
+              {interests.length === 0 ? (
+                <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <Heart size={28} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-sm text-gray-400">Sin clientes interesados registrados</p>
+                  <button
+                    onClick={() => { loadClients(); setShowInterestForm(true); }}
+                    className="inline-flex items-center gap-1 mt-2 text-sm text-pink-600 hover:underline"
+                  >
+                    <Plus size={14} /> Registrar interés
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {interests.map((interest) => {
+                    const level = INTEREST_LEVELS.find(l => l.value === interest.interestLevel);
+                    return (
+                      <div key={interest.id} className="flex items-start justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 hover:border-pink-200 hover:bg-white transition-all">
+                        <div className="flex items-start gap-3">
+                          <div className="p-1.5 bg-pink-50 rounded-full mt-0.5">
+                            <User size={16} className="text-pink-500" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-sm text-gray-900">{interest.client.firstName} {interest.client.lastName}</span>
+                              {level && (
+                                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${level.color}`}>
+                                  {Array.from({ length: level.stars }).map((_, i) => (
+                                    <Star key={i} size={10} fill="currentColor" />
+                                  ))}
+                                  {level.label}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {interest.client.phone}{interest.client.email ? ` · ${interest.client.email}` : ''}
+                            </div>
+                            {interest.notes && (
+                              <p className="text-xs text-gray-600 mt-1 italic">{interest.notes}</p>
+                            )}
+                            <div className="text-xs text-gray-400 mt-1">
+                              {new Date(interest.interestDate).toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' })}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteInterest(interest.id)}
+                          disabled={deletingInterestId === interest.id}
+                          className="p-1.5 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* ── Process Timeline ─────────────────────────────────── */}
             <div className="mt-6">
@@ -481,6 +710,15 @@ export const PropertyViewPage = () => {
 
       {detailProcess && (
         <ProcessDetailModal process={detailProcess} onClose={() => setDetailProcess(null)} />
+      )}
+
+      {showInterestForm && id && (
+        <InterestFormModal
+          propertyId={id}
+          clients={clients}
+          onClose={() => setShowInterestForm(false)}
+          onSaved={(item) => setInterests(prev => [item, ...prev])}
+        />
       )}
     </div>
   );

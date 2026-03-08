@@ -25,6 +25,8 @@ import { ClientsManagementPage } from './pages/admin/clients/ClientsManagementPa
 import { ClientFormPage } from './pages/admin/clients/ClientFormPage';
 import { ConfigurationPage } from './pages/admin/configuration/ConfigurationPage';
 import { FilesManagementPage } from './pages/admin/files/FilesManagementPage';
+import { BlacklistManagementPage } from './pages/admin/blacklist/BlacklistManagementPage';
+import { BlacklistFormPage } from './pages/admin/blacklist/BlacklistFormPage';
 
 function App() {
   return (
@@ -33,10 +35,10 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route element={<PublicLayout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/propiedades" element={<PropertiesPage />} />
-            <Route path="/propiedades/:id" element={<PropertyDetailPage />} />
-            <Route path="/contacto" element={<ContactPage />} />
+            <Route path="/" element={<Navigate to="/admin/login" replace />} />
+            {/* <Route path="/propiedades" element={<PropertiesPage />} /> */}
+            {/* <Route path="/propiedades/:id" element={<PropertyDetailPage />} /> */}
+            {/* <Route path="/contacto" element={<ContactPage />} /> */}
           </Route>
 
           {/* Admin Auth Routes (no layout) */}
@@ -68,6 +70,11 @@ function App() {
               
               <Route path="/admin/archivos" element={<FilesManagementPage />} />
               <Route path="/admin/configuracion" element={<ConfigurationPage />} />
+
+              {/* Blacklist Routes */}
+              <Route path="/admin/lista-negra" element={<BlacklistManagementPage />} />
+              <Route path="/admin/lista-negra/nuevo" element={<BlacklistFormPage />} />
+              <Route path="/admin/lista-negra/editar/:id" element={<BlacklistFormPage />} />
             </Route>
           </Route>
 
