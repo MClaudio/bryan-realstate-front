@@ -11,6 +11,8 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -50,8 +52,18 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
+          # Autenticar el remote con el token para poder hacer push
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
           git fetch origin main
+
+          # Guardar los cambios generados (dist/) antes del rebase
+          git stash --include-untracked
+
           git pull --rebase origin main || echo "Nothing to pull"
+
+          # Restaurar los cambios generados
+          git stash pop || true
 
           git add -f dist/
 
