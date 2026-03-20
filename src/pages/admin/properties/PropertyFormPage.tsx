@@ -103,6 +103,7 @@ export const PropertyFormPage = () => {
 
   const watchedStatus = useWatch({ control, name: 'status' });
   const watchedNegotiationClientId = useWatch({ control, name: 'negotiationClientId' });
+  const watchedBasicServices = useWatch({ control, name: 'basicServices' }) as string[] || [];
 
   // Initialize clientSearch label when editing a property that already has a negotiation client
   useEffect(() => {
@@ -339,8 +340,8 @@ export const PropertyFormPage = () => {
         ...data,
         fileIds: fileIds.filter(id => id && id.length === 36) || [],
         documentFileIds: documentFileIds.filter(id => id && id.length === 36) || [],
-        // Only send negotiationClientId when status is Negociación; clear it otherwise
-        negotiationClientId: data.status === 'Negociación' && data.negotiationClientId
+        // Send negotiationClientId when status is Negociación or Vendido; clear it otherwise
+        negotiationClientId: (data.status === 'Negociación' || data.status === 'Vendido') && data.negotiationClientId
           ? data.negotiationClientId
           : null,
       };
@@ -591,10 +592,10 @@ export const PropertyFormPage = () => {
               </select>
             </div>
 
-            {watchedStatus === 'Negociación' && (
+            {(watchedStatus === 'Negociación' || watchedStatus === 'Vendido') && (
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cliente en Negociación <span className="text-red-500">*</span>
+                  Cliente <span className="text-red-500">*</span>
                 </label>
                 {/* Hidden field for react-hook-form validation */}
                 <input type="hidden" {...register('negotiationClientId', { required: 'Debes seleccionar el cliente en negociación' })} />
@@ -821,11 +822,11 @@ export const PropertyFormPage = () => {
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Servicios Básicos</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {['Agua', 'Luz', 'Internet', 'Gas', 'Alcantarillado', 'Teléfono'].map((service) => (
+                  {['Agua', 'Luz', 'Internet', 'Agua de Riego', 'Alcantarillado', 'Teléfono'].map((service) => (
                     <label key={service} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={getValues('basicServices')?.includes(service) || false}
+                        checked={watchedBasicServices.includes(service)}
                         onChange={() => handleBasicServiceToggle(service)}
                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />

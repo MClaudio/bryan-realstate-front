@@ -21,7 +21,9 @@ export const ClientFormPage = () => {
       phone: '',
       address: '',
       ruc: '',
-      birthDate: ''
+      birthDate: '',
+      notes: '',
+      interestDescription: ''
     }
   });
 
@@ -81,6 +83,14 @@ export const ClientFormPage = () => {
       // Handle date
       if (data.birthDate && String(data.birthDate).trim().length > 0) {
         payload.birthDate = new Date(data.birthDate).toISOString();
+      }
+
+      // Optional text fields
+      if (data.notes && data.notes.trim().length > 0) {
+        payload.notes = data.notes.trim();
+      }
+      if (data.interestDescription && data.interestDescription.trim().length > 0) {
+        payload.interestDescription = data.interestDescription.trim();
       }
 
       if (isEditMode) {
@@ -185,6 +195,31 @@ export const ClientFormPage = () => {
               {...register('address')}
               className="w-full p-2 border rounded-md"
             />
+          </div>
+
+          {/* Notes & Interests */}
+          <div className="md:col-span-2 border-t pt-4 mt-2">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Información Adicional</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nota</label>
+                <textarea
+                  {...register('notes')}
+                  rows={4}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                  placeholder="Ej: No llamar antes de las 12pm..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Intereses</label>
+                <textarea
+                  {...register('interestDescription')}
+                  rows={4}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                  placeholder="Ej: Busca una propiedad de 500m² en el centro..."
+                />
+              </div>
+            </div>
           </div>
 
           <div className="md:col-span-2 border-t pt-4 mt-2">

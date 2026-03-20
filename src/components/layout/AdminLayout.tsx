@@ -17,6 +17,12 @@ import {
   UserCircle
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import api from '../../services/api';
+
+interface AppConfig {
+  businessName: string | null;
+  logo?: { id: string; path: string } | null;
+}
 
 export const AdminLayout = () => {
   const { logout, user } = useAuth();
@@ -26,6 +32,26 @@ export const AdminLayout = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // Fetch company configuration once on mount
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await api.get('/configuration');
+        const config: AppConfig = res.data;
+        setAppConfig(config);
+        if (config?.logo?.id) {
+          const urlRes = await api.get(`/files/${config.logo.id}/url`);
+          setLogoUrl(urlRes.data.url ?? null);
+        }
+      } catch {
+        // Non-critical — keep defaults
+      }
+    };
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -103,8 +129,18 @@ export const AdminLayout = () => {
         {/* Logo and Toggle */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <Link to="/admin/dashboard" className={`flex items-center gap-2 ${!isSidebarOpen && !isMobile ? 'hidden' : 'flex'}`}>
-            <Home className="w-6 h-6 text-blue-600" />
-            <span className="font-bold text-lg text-gray-800">Bryan RealState</span>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="w-8 h-8 object-contain rounded"
+              />
+            ) : (
+              <Home className="w-6 h-6 text-blue-600" />
+            )}
+            <span className="font-bold text-lg text-gray-800 truncate">
+              {appConfig?.businessName || 'Bryan Realstate'}
+            </span>
           </Link>
           {/* Botón toggle solo visible en desktop */}
           {!isMobile && (
