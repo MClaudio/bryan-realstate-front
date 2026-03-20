@@ -12,6 +12,8 @@ interface Client {
   phone: string;
   ruc: string | null;
   lastLogin: boolean;
+  notes: string | null;
+  interestDescription: string | null;
   createdAt: string;
 }
 
@@ -111,7 +113,15 @@ export const ClientsManagementPage = () => {
                       <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
                         <User size={16} />
                       </div>
-                      {client.firstName} {client.lastName}
+                      <div className="flex flex-col">
+                        <span>{client.firstName} {client.lastName}</span>
+                        {(client.notes || client.interestDescription) && (
+                          <div className="flex gap-1 mt-1">
+                            {client.notes && <span className="text-[10px] bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded" title="Nota guardada">Nota</span>}
+                            {client.interestDescription && <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded" title="Intereses guardados">Intereses</span>}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex flex-col text-sm text-gray-600">
