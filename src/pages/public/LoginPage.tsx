@@ -22,9 +22,9 @@ export const LoginPage = () => {
     setError("");
     try {
       const response = await api.post("/auth/login", data);
-      const { access_token, user } = response.data;
+      const { access_token, refresh_token, user } = response.data;
 
-      login(access_token, user);
+      login(access_token, user, refresh_token);
       toastSuccess(`Bienvenido, ${user.firstName}`);
 
       // Redirect based on user role or first login

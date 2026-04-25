@@ -13,7 +13,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (token: string, user: User) => void;
+  refreshToken: string | null;
+  login: (token: string, user: User, refreshToken?: string) => void;
   logout: () => void;
   updateUser: (updatedFields: Partial<User>) => void;
   isAuthenticated: boolean;
@@ -25,37 +26,47 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     try {
       const storedToken = localStorage.getItem('token');
+      const storedRefreshToken = localStorage.getItem('refresh_token');
       const storedUser = localStorage.getItem('user');
 
       if (storedToken && storedUser) {
         setToken(storedToken);
+        setRefreshToken(storedRefreshToken);
         setUser(JSON.parse(storedUser));
       }
     } catch (error) {
       console.error('Error restoring session:', error);
       localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
+  const login = (newToken: string, newUser: User, newRefreshToken?: string) => {
     localStorage.setItem('token', newToken);
+    if (newRefreshToken) {
+      localStorage.setItem('refresh_token', newRefreshToken);
+    }
     localStorage.setItem('user', JSON.stringify(newUser));
     setToken(newToken);
+    setRefreshToken(newRefreshToken ?? null);
     setUser(newUser);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
     setToken(null);
+    setRefreshToken(null);
     setUser(null);
   };
 
@@ -73,6 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       value={{
         user,
         token,
+        refreshToken,
         login,
         logout,
         updateUser,
