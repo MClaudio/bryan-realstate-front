@@ -384,7 +384,7 @@ export const DashboardPage = () => {
                     alt={property.code}
                     className="w-16 h-16 rounded-lg object-cover"
                   />
-                  <div className="flex-1">
+                  <div className="flex-1 w-full overflow-hidden">
                     <h4 className="font-semibold text-gray-900">
                       {property.code}
                     </h4>
