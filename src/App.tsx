@@ -19,6 +19,7 @@ import { UsersManagementPage } from './pages/admin/users/UsersManagementPage';
 import { UserFormPage } from './pages/admin/users/UserFormPage';
 import { ClientsManagementPage } from './pages/admin/clients/ClientsManagementPage';
 import { ClientFormPage } from './pages/admin/clients/ClientFormPage';
+import { GoogleOAuthCallbackPage } from './pages/admin/clients/GoogleOAuthCallbackPage';
 import { ConfigurationPage } from './pages/admin/configuration/ConfigurationPage';
 import { FilesManagementPage } from './pages/admin/files/FilesManagementPage';
 import { BlacklistManagementPage } from './pages/admin/blacklist/BlacklistManagementPage';
@@ -43,6 +44,7 @@ function App() {
           <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/oauth/google/callback" element={<GoogleOAuthCallbackPage />} />
 
           {/* Protected Admin Routes */}
           <Route element={<ProtectedRoute />}>
