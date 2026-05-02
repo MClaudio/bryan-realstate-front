@@ -5,13 +5,9 @@ import { AdminLayout } from './components/layout/AdminLayout';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 
 // Public Pages
-import { HomePage } from './pages/public/HomePage';
-import { PropertiesPage } from './pages/public/PropertiesPage';
-import { ContactPage } from './pages/public/ContactPage';
 import { LoginPage } from './pages/public/LoginPage';
 import { ForgotPasswordPage } from './pages/public/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/public/ResetPasswordPage';
-import { PropertyDetailPage } from './pages/public/PropertyDetailPage';
 
 // Admin Pages
 import { DashboardPage } from './pages/admin/DashboardPage';
@@ -23,8 +19,12 @@ import { UsersManagementPage } from './pages/admin/users/UsersManagementPage';
 import { UserFormPage } from './pages/admin/users/UserFormPage';
 import { ClientsManagementPage } from './pages/admin/clients/ClientsManagementPage';
 import { ClientFormPage } from './pages/admin/clients/ClientFormPage';
+import { GoogleOAuthCallbackPage } from './pages/admin/clients/GoogleOAuthCallbackPage';
 import { ConfigurationPage } from './pages/admin/configuration/ConfigurationPage';
 import { FilesManagementPage } from './pages/admin/files/FilesManagementPage';
+import { BlacklistManagementPage } from './pages/admin/blacklist/BlacklistManagementPage';
+import { BlacklistFormPage } from './pages/admin/blacklist/BlacklistFormPage';
+import { ProfilePage } from './pages/admin/ProfilePage';
 
 function App() {
   return (
@@ -33,16 +33,18 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route element={<PublicLayout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/propiedades" element={<PropertiesPage />} />
-            <Route path="/propiedades/:id" element={<PropertyDetailPage />} />
-            <Route path="/contacto" element={<ContactPage />} />
+            <Route path="/" element={<Navigate to="/admin/login" replace />} />
+            {/* <Route path="/propiedades" element={<PropertiesPage />} /> */}
+            {/* <Route path="/propiedades/:id" element={<PropertyDetailPage />} /> */}
+            {/* <Route path="/contacto" element={<ContactPage />} /> */}
           </Route>
 
           {/* Admin Auth Routes (no layout) */}
           <Route path="/admin/login" element={<LoginPage />} />
           <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/oauth/google/callback" element={<GoogleOAuthCallbackPage />} />
 
           {/* Protected Admin Routes */}
           <Route element={<ProtectedRoute />}>
@@ -68,6 +70,14 @@ function App() {
               
               <Route path="/admin/archivos" element={<FilesManagementPage />} />
               <Route path="/admin/configuracion" element={<ConfigurationPage />} />
+
+              {/* Blacklist Routes */}
+              <Route path="/admin/lista-negra" element={<BlacklistManagementPage />} />
+              <Route path="/admin/lista-negra/nuevo" element={<BlacklistFormPage />} />
+              <Route path="/admin/lista-negra/editar/:id" element={<BlacklistFormPage />} />
+
+              {/* Profile Route */}
+              <Route path="/admin/mi-perfil" element={<ProfilePage />} />
             </Route>
           </Route>
 

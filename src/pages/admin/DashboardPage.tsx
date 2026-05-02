@@ -7,8 +7,6 @@ import {
   Eye,
   ArrowUpRight,
   ArrowDownRight,
-  Filter,
-  Download,
   RefreshCw,
   BarChart3,
   PieChart,
@@ -69,7 +67,7 @@ export const DashboardPage = () => {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState("7d");
+  const [timeRange] = useState("7d");
 
   useEffect(() => {
     fetchDashboardData();
@@ -149,11 +147,6 @@ export const DashboardPage = () => {
   const StatusChart = () => {
     if (!dashboardData?.propertiesByStatus?.length) return null;
 
-    const total = dashboardData.propertiesByStatus.reduce(
-      (sum, item) => sum + item._count.id,
-      0,
-    );
-
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
@@ -164,7 +157,6 @@ export const DashboardPage = () => {
         </div>
         <div className="space-y-3">
           {dashboardData.propertiesByStatus.map((item, index) => {
-            const percentage = total > 0 ? (item._count.id / total) * 100 : 0;
             const colors = [
               "bg-blue-500",
               "bg-green-500",
@@ -392,7 +384,7 @@ export const DashboardPage = () => {
                     alt={property.code}
                     className="w-16 h-16 rounded-lg object-cover"
                   />
-                  <div className="flex-1">
+                  <div className="flex-1 w-full overflow-hidden">
                     <h4 className="font-semibold text-gray-900">
                       {property.code}
                     </h4>

@@ -6,7 +6,6 @@ import {
   Search,
   Eye,
   Filter,
-  Download,
   RefreshCw,
   Star,
   ToggleLeft,
@@ -85,18 +84,7 @@ export const PropertiesManagementPage = () => {
     }
   };
 
-  const toggleFeatured = async (id: string, currentStatus: boolean) => {
-    try {
-      await api.patch(`/properties/${id}`, { isFeatured: !currentStatus });
-      toastSuccess(
-        `Propiedad ${!currentStatus ? "destacada" : "quitada de destacados"}`,
-      );
-      fetchProperties();
-    } catch (error) {
-      console.error("Error updating featured status:", error);
-      alertError("Error", "No se pudo actualizar el estado de destacado");
-    }
-  };
+
 
   const toggleActive = async (id: string, currentStatus: boolean) => {
     try {

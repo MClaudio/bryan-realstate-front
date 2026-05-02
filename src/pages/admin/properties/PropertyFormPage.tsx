@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import api from '../../../services/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
@@ -46,18 +46,23 @@ export const PropertyFormPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [property, setProperty] = useState<Property | null>(null);
+  const [_property, setProperty] = useState<Property | null>(null);
   const [fileIds, setFileIds] = useState<string[]>([]);
   const [documentFileIds, setDocumentFileIds] = useState<string[]>([]);
   const [initialImageFiles, setInitialImageFiles] = useState<{ id: string; url: string; name: string; size?: number }[]>([]);
   const [initialDocumentFiles, setInitialDocumentFiles] = useState<{ id: string; url: string; name: string; size?: number }[]>([]);
   const [advisors, setAdvisors] = useState<Array<{id: string; firstName: string; lastName: string}>>([]);
+  const [clients, setClients] = useState<Array<{id: string; firstName: string; lastName: string; phone: string}>>([]);
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState('basic');
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showBasicServices, setShowBasicServices] = useState(false);
+  const [resolvingUrl, setResolvingUrl] = useState(false);
 
-  const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, setValue, getValues, control, formState: { errors } } = useForm({
     mode: 'onBlur',
     reValidateMode: 'onSubmit',
     criteriaMode: 'firstError',
@@ -91,13 +96,56 @@ export const PropertyFormPage = () => {
       tiktokUrl: '',
       instagramUrl: '',
       youtubeUrl: '',
-      locationUrl: ''
+      locationUrl: '',
+      negotiationClientId: ''
     }
   });
 
-  const extractCoordsFromGoogleMapsUrl = useCallback((url: string) => {
+  const watchedStatus = useWatch({ control, name: 'status' });
+  const watchedNegotiationClientId = useWatch({ control, name: 'negotiationClientId' });
+  const watchedBasicServices = useWatch({ control, name: 'basicServices' }) as string[] || [];
+
+  // Initialize clientSearch label when editing a property that already has a negotiation client
+  useEffect(() => {
+    if (watchedNegotiationClientId && clients.length > 0) {
+      const found = clients.find(c => c.id === watchedNegotiationClientId);
+      if (found) setClientSearch(`${found.firstName} ${found.lastName}`);
+    }
+  }, [watchedNegotiationClientId, clients]);
+
+  // Close client dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node)) {
+        setClientDropdownOpen(false);
+      }
+    };
+    if (clientDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [clientDropdownOpen]);
+
+  const extractCoordsFromGoogleMapsUrl = useCallback(async (url: string) => {
     if (!url) return;
-    // For place URLs, !3d!4d pairs appear for each result; the LAST one is the target place pin.
+
+    // Short URLs (maps.app.goo.gl, goo.gl) need server-side redirect resolution
+    const isShortUrl = /goo\.gl\/|maps\.app\.goo\.gl/.test(url);
+    if (isShortUrl) {
+      try {
+        setResolvingUrl(true);
+        const res = await api.get(`/properties/resolve-maps-url?url=${encodeURIComponent(url)}`);
+        setValue('latitude', res.data.latitude, { shouldValidate: true });
+        setValue('longitude', res.data.longitude, { shouldValidate: true });
+        // Also update the locationUrl field with the resolved full URL
+        setValue('locationUrl', res.data.resolvedUrl, { shouldValidate: true });
+      } catch (err) {
+        console.error('Error resolving maps URL:', err);
+      } finally {
+        setResolvingUrl(false);
+      }
+      return;
+    }
+
+    // Full URLs: parse directly on the client
     const placeMatches = [...url.matchAll(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/g)];
     if (placeMatches.length > 0) {
       const last = placeMatches[placeMatches.length - 1];
@@ -105,7 +153,6 @@ export const PropertyFormPage = () => {
       setValue('longitude', last[2], { shouldValidate: true });
       return;
     }
-    // Fall back: simple map link patterns
     const fallbackPatterns = [
       /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
       /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
@@ -131,6 +178,15 @@ export const PropertyFormPage = () => {
     }
   }, []);
 
+  const fetchClients = useCallback(async () => {
+    try {
+      const response = await api.get('/clients');
+      setClients(response.data);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+    }
+  }, []);
+
   // Memoize file upload callbacks to prevent FileUpload re-renders
   const handleImageFilesChange = useCallback((files: Array<{ id: string }>) => {
     console.log('Image files changed:', files);
@@ -145,7 +201,8 @@ export const PropertyFormPage = () => {
   // Fetch advisors only once on mount
   useEffect(() => {
     fetchAdvisors();
-  }, [fetchAdvisors]);
+    fetchClients();
+  }, [fetchAdvisors, fetchClients]);
 
   // Fetch property when id changes
   useEffect(() => {
@@ -195,7 +252,8 @@ export const PropertyFormPage = () => {
           tiktokUrl: propertyData.tiktokUrl || '',
           instagramUrl: propertyData.instagramUrl || '',
           youtubeUrl: propertyData.youtubeUrl || '',
-          locationUrl: propertyData.locationUrl || ''
+          locationUrl: propertyData.locationUrl || '',
+          negotiationClientId: propertyData.negotiationClientId || ''
         });
 
         setShowBasicServices(propertyData.hasBasicServices);
@@ -281,7 +339,11 @@ export const PropertyFormPage = () => {
       const payload = {
         ...data,
         fileIds: fileIds.filter(id => id && id.length === 36) || [],
-        documentFileIds: documentFileIds.filter(id => id && id.length === 36) || []
+        documentFileIds: documentFileIds.filter(id => id && id.length === 36) || [],
+        // Send negotiationClientId when status is Negociación or Vendido; clear it otherwise
+        negotiationClientId: (data.status === 'Negociación' || data.status === 'Vendido') && data.negotiationClientId
+          ? data.negotiationClientId
+          : null,
       };
       
       console.log('=== SUBMITTING PROPERTY ===');
@@ -328,6 +390,14 @@ export const PropertyFormPage = () => {
       </option>
     ));
   }, [advisors]);
+
+  const filteredClients = useMemo(() => {
+    const q = clientSearch.toLowerCase();
+    return clients.filter(c =>
+      `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
+      c.phone.includes(q)
+    );
+  }, [clients, clientSearch]);
 
   // Memoize property type options
   const propertyTypeOptions = useMemo(() => (
@@ -522,6 +592,59 @@ export const PropertyFormPage = () => {
               </select>
             </div>
 
+            {(watchedStatus === 'Negociación' || watchedStatus === 'Vendido') && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cliente <span className="text-red-500">*</span>
+                </label>
+                {/* Hidden field for react-hook-form validation */}
+                <input type="hidden" {...register('negotiationClientId', { required: 'Debes seleccionar el cliente en negociación' })} />
+                <div className="relative" ref={clientDropdownRef}>
+                  <input
+                    type="text"
+                    value={clientSearch}
+                    onChange={e => {
+                      setClientSearch(e.target.value);
+                      setValue('negotiationClientId', '', { shouldValidate: false });
+                      setClientDropdownOpen(true);
+                    }}
+                    onFocus={() => setClientDropdownOpen(true)}
+                    placeholder="Escribe nombre o teléfono..."
+                    className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                      errors.negotiationClientId ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    autoComplete="off"
+                  />
+                  {clientDropdownOpen && filteredClients.length > 0 && (
+                    <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                      {filteredClients.map(client => (
+                        <li
+                          key={client.id}
+                          onMouseDown={() => {
+                            setValue('negotiationClientId', client.id, { shouldValidate: true });
+                            setClientSearch(`${client.firstName} ${client.lastName}`);
+                            setClientDropdownOpen(false);
+                          }}
+                          className="px-4 py-2 cursor-pointer hover:bg-blue-50 text-sm flex justify-between"
+                        >
+                          <span className="font-medium">{client.firstName} {client.lastName}</span>
+                          <span className="text-gray-400 text-xs">{client.phone}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {clientDropdownOpen && filteredClients.length === 0 && clientSearch.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg px-4 py-2 text-sm text-gray-500">
+                      No se encontraron clientes
+                    </div>
+                  )}
+                </div>
+                {errors.negotiationClientId && (
+                  <span className="text-red-500 text-xs">{errors.negotiationClientId.message as string}</span>
+                )}
+              </div>
+            )}
+
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Dirección Completa *</label>
               <input
@@ -567,18 +690,36 @@ export const PropertyFormPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">URL de Google Maps *</label>
-              <input
-                type="url"
-                {...register('locationUrl', { required: 'La URL de Google Maps es requerida' })}
-                onChange={(e) => {
-                  register('locationUrl').onChange(e);
-                  extractCoordsFromGoogleMapsUrl(e.target.value);
-                }}
-                className={`w-full p-2 border rounded-md ${errors.locationUrl ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
-                placeholder="https://www.google.com/maps/@-2.1234,-78.5678,15z"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  {...register('locationUrl', { required: 'La URL de Google Maps es requerida' })}
+                  onPaste={(e) => {
+                    const pastedUrl = e.clipboardData.getData('text').trim();
+                    if (pastedUrl) {
+                      e.preventDefault();
+                      setValue('locationUrl', pastedUrl, { shouldValidate: true });
+                      extractCoordsFromGoogleMapsUrl(pastedUrl);
+                    }
+                  }}
+                  onChange={(e) => {
+                    register('locationUrl').onChange(e);
+                    const val = e.target.value.trim();
+                    if (val.startsWith('http') && val.length > 25) {
+                      extractCoordsFromGoogleMapsUrl(val);
+                    }
+                  }}
+                  className={`w-full p-2 border rounded-md pr-10 ${errors.locationUrl ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+                  placeholder="https://maps.app.goo.gl/... o https://www.google.com/maps/..."
+                />
+                {resolvingUrl && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
               {errors.locationUrl && <span className="text-red-500 text-xs">{errors.locationUrl.message as string}</span>}
-              <p className="text-xs text-gray-500 mt-1">Al pegar la URL se extraerán automáticamente la latitud y longitud.</p>
+              <p className="text-xs text-gray-500 mt-1">Soporta URLs cortas (maps.app.goo.gl) y completas. La latitud y longitud se extraen automáticamente.</p>
             </div>
 
             <div>
@@ -681,11 +822,11 @@ export const PropertyFormPage = () => {
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Servicios Básicos</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {['Agua', 'Luz', 'Internet', 'Gas', 'Alcantarillado', 'Teléfono'].map((service) => (
+                  {['Agua', 'Luz', 'Internet', 'Agua de Riego', 'Alcantarillado', 'Teléfono'].map((service) => (
                     <label key={service} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={getValues('basicServices')?.includes(service) || false}
+                        checked={watchedBasicServices.includes(service)}
                         onChange={() => handleBasicServiceToggle(service)}
                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />

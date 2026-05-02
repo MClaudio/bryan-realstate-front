@@ -1,33 +1,40 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api';
-import { Lock, User, LogIn, Home } from 'lucide-react';
-import { alertError, toastSuccess } from '../../utils/alerts';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api";
+import { Lock, User, LogIn, Home } from "lucide-react";
+import { alertError, toastSuccess } from "../../utils/alerts";
 
 export const LoginPage = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm();
-  const [error, setError] = useState('');
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm();
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const onSubmit = async (data: any) => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
-      const response = await api.post('/auth/login', data);
-      const { access_token, user } = response.data;
-      
-      login(access_token, user);
+      const response = await api.post("/auth/login", data);
+      const { access_token, refresh_token, user } = response.data;
+
+      login(access_token, user, refresh_token);
       toastSuccess(`Bienvenido, ${user.firstName}`);
-      
+
       // Redirect based on user role or first login
-      navigate('/admin/dashboard');
+      navigate("/admin/dashboard");
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al iniciar sesión');
-      alertError('Inicio de sesión fallido', err.response?.data?.message || 'Verifica tus credenciales');
+      setError(err.response?.data?.message || "Error al iniciar sesión");
+      alertError(
+        "Inicio de sesión fallido",
+        err.response?.data?.message || "Verifica tus credenciales",
+      );
     } finally {
       setLoading(false);
     }
@@ -53,9 +60,7 @@ export const LoginPage = () => {
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Bienvenido de nuevo
           </h2>
-          <p className="text-gray-600">
-            Accede a tu panel administrativo
-          </p>
+          <p className="text-gray-600">Accede a tu panel administrativo</p>
         </div>
 
         {/* Login Card */}
@@ -66,10 +71,13 @@ export const LoginPage = () => {
                 <p className="text-red-700 text-sm font-medium">{error}</p>
               </div>
             )}
-            
+
             {/* Username Field */}
             <div>
-              <label htmlFor="username" className="block text-sm font-semibold text-gray-700 mb-2">
+              <label
+                htmlFor="username"
+                className="block text-sm font-semibold text-gray-700 mb-2"
+              >
                 Usuario
               </label>
               <div className="relative">
@@ -80,20 +88,29 @@ export const LoginPage = () => {
                   id="username"
                   type="text"
                   className={`block w-full pl-10 pr-3 py-3 border ${
-                    errors.username ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                    errors.username
+                      ? "border-red-300 focus:ring-red-500 focus:border-red-500"
+                      : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                   } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-colors`}
                   placeholder="Tu usuario"
-                  {...register('username', { required: 'El usuario es requerido' })}
+                  {...register("username", {
+                    required: "El usuario es requerido",
+                  })}
                 />
               </div>
               {errors.username && (
-                <p className="mt-1 text-sm text-red-600">{errors.username.message as string}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.username.message as string}
+                </p>
               )}
             </div>
-            
+
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-semibold text-gray-700 mb-2"
+              >
                 Contraseña
               </label>
               <div className="relative">
@@ -104,21 +121,27 @@ export const LoginPage = () => {
                   id="password"
                   type="password"
                   className={`block w-full pl-10 pr-3 py-3 border ${
-                    errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                    errors.password
+                      ? "border-red-300 focus:ring-red-500 focus:border-red-500"
+                      : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                   } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-colors`}
                   placeholder="Tu contraseña"
-                  {...register('password', { required: 'La contraseña es requerida' })}
+                  {...register("password", {
+                    required: "La contraseña es requerida",
+                  })}
                 />
               </div>
               {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message as string}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.password.message as string}
+                </p>
               )}
             </div>
 
             {/* Forgot Password Link */}
             <div className="flex items-center justify-end">
               <Link
-                to="/forgot-password"
+                to="/admin/forgot-password"
                 className="text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
               >
                 ¿Olvidaste tu contraseña?
@@ -159,7 +182,8 @@ export const LoginPage = () => {
 
         {/* Footer Note */}
         <p className="mt-6 text-center text-xs text-gray-500">
-          © {new Date().getFullYear()} Bryan RealState. Todos los derechos reservados.
+          © {new Date().getFullYear()} Bryan RealState. Todos los derechos
+          reservados.
         </p>
       </div>
     </div>

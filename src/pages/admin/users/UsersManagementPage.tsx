@@ -13,6 +13,7 @@ interface User {
   type: 'ADMIN' | 'ACCOUNTING' | 'EMPLOYEE';
   phone: string;
   ruc: string;
+  isActive: boolean;
 }
 
 export const UsersManagementPage = () => {
@@ -36,16 +37,16 @@ export const UsersManagementPage = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const confirm = await alertConfirm('Eliminar usuario', '¿Estás seguro de eliminar este usuario?');
+    const confirm = await alertConfirm('Desactivar usuario', '¿Estás seguro de desactivar este usuario? No podrá acceder al sistema.');
     if (!confirm.isConfirmed) return;
     try {
       await api.delete(`/users/${id}`);
-      toastSuccess('Usuario eliminado');
+      toastSuccess('Usuario desactivado');
       fetchUsers();
     } catch (error: any) {
-      console.error('Error deleting user:', error);
-      const msg = error.response?.data?.message || 'No se puede eliminar el usuario. Puede que tenga registros relacionados.';
-      alertError('Error al eliminar', msg);
+      console.error('Error deactivating user:', error);
+      const msg = error.response?.data?.message || 'No se pudo desactivar el usuario.';
+      alertError('Error al desactivar', msg);
     }
   };
 
@@ -101,6 +102,7 @@ export const UsersManagementPage = () => {
                 <th className="p-4 font-semibold text-gray-600">Nombre Completo</th>
                 <th className="p-4 font-semibold text-gray-600">Email</th>
                 <th className="p-4 font-semibold text-gray-600">Rol</th>
+                <th className="p-4 font-semibold text-gray-600">Estado</th>
                 <th className="p-4 font-semibold text-gray-600">Teléfono</th>
                 <th className="p-4 font-semibold text-gray-600 text-right">Acciones</th>
               </tr>
@@ -108,15 +110,15 @@ export const UsersManagementPage = () => {
             <tbody className="divide-y">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-500">Cargando...</td>
+                  <td colSpan={7} className="p-8 text-center text-gray-500">Cargando...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-500">No se encontraron usuarios</td>
+                  <td colSpan={7} className="p-8 text-center text-gray-500">No se encontraron usuarios</td>
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr key={user.id} className={`hover:bg-gray-50 ${!user.isActive ? 'opacity-60 bg-gray-50' : ''}`}>
                     <td className="p-4 font-medium flex items-center gap-2">
                       <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600">
                         <User size={16} />
@@ -132,18 +134,27 @@ export const UsersManagementPage = () => {
                         {user.type}
                       </span>
                     </td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                      }`}>
+                        {user.isActive ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
                     <td className="p-4 text-gray-600">{user.phone || '-'}</td>
                     <td className="p-4 text-right space-x-2">
                       <Link to={`/admin/usuarios/editar/${user.id}`} className="text-blue-500 hover:text-blue-700 inline-block" title="Editar">
                         <Edit size={18} />
                       </Link>
-                      <button 
-                        className="text-red-500 hover:text-red-700" 
-                        title="Eliminar"
-                        onClick={() => handleDelete(user.id)}
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      {user.isActive && (
+                        <button 
+                          className="text-red-500 hover:text-red-700" 
+                          title="Desactivar"
+                          onClick={() => handleDelete(user.id)}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

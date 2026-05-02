@@ -12,9 +12,17 @@ import {
   X,
   Bell,
   ChevronDown,
-  Home
+  Home,
+  ShieldX,
+  UserCircle
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import api from '../../services/api';
+
+interface AppConfig {
+  businessName: string | null;
+  logo?: { id: string; path: string } | null;
+}
 
 export const AdminLayout = () => {
   const { logout, user } = useAuth();
@@ -24,6 +32,26 @@ export const AdminLayout = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // Fetch company configuration once on mount
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await api.get('/configuration');
+        const config: AppConfig = res.data;
+        setAppConfig(config);
+        if (config?.logo?.id) {
+          const urlRes = await api.get(`/files/${config.logo.id}/url`);
+          setLogoUrl(urlRes.data.url ?? null);
+        }
+      } catch {
+        // Non-critical — keep defaults
+      }
+    };
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -69,6 +97,7 @@ export const AdminLayout = () => {
     { path: '/admin/clientes', icon: UserCheck, label: 'Clientes' },
     { path: '/admin/propiedades/gestion', icon: Building2, label: 'Propiedades' },
     { path: '/admin/archivos', icon: FolderOpen, label: 'Archivos' },
+    { path: '/admin/lista-negra', icon: ShieldX, label: 'Lista Negra' },
     { path: '/admin/configuracion', icon: Settings, label: 'Configuración' },
   ];
 
@@ -100,8 +129,18 @@ export const AdminLayout = () => {
         {/* Logo and Toggle */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <Link to="/admin/dashboard" className={`flex items-center gap-2 ${!isSidebarOpen && !isMobile ? 'hidden' : 'flex'}`}>
-            <Home className="w-6 h-6 text-blue-600" />
-            <span className="font-bold text-lg text-gray-800">Bryan RealState</span>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="w-8 h-8 object-contain rounded"
+              />
+            ) : (
+              <Home className="w-6 h-6 text-blue-600" />
+            )}
+            <span className="font-bold text-lg text-gray-800 truncate">
+              {appConfig?.businessName || 'Bryan Realstate'}
+            </span>
           </Link>
           {/* Botón toggle solo visible en desktop */}
           {!isMobile && (
@@ -168,6 +207,15 @@ export const AdminLayout = () => {
                   ? 'bottom-0 left-full ml-2 w-48'
                   : 'bottom-full left-0 right-0 mb-2'
               }`}>
+                <Link
+                  to="/admin/mi-perfil"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-3 w-full px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <UserCircle className="w-4 h-4 shrink-0" />
+                  <span>Mi Perfil</span>
+                </Link>
+                <div className="border-t border-gray-100 my-1" />
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-3 w-full px-4 py-2 text-red-600 hover:bg-red-50 transition-colors"
