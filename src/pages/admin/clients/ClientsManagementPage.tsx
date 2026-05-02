@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, Search, User, Phone, Mail, Calendar, RefreshCcw, X,
 import api from '../../../services/api';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { alertConfirm, alertError, toastSuccess } from '../../../utils/alerts';
+import { formatPhoneNumber } from '../../../utils/phoneFormatter';
 
 interface Client {
   id: string;
@@ -304,7 +305,7 @@ export const ClientsManagementPage = () => {
                           </span>
                         )}
                         <span className="flex items-center gap-1">
-                          <Phone size={12} /> {client.phone}
+                          <Phone size={12} /> {formatPhoneNumber(client.phone).isValid ? formatPhoneNumber(client.phone).formatted : '-'}
                         </span>
                       </div>
                     </td>
@@ -447,7 +448,7 @@ export const ClientsManagementPage = () => {
                         </td>
                         <td className="p-3">{contact.fullName || `${contact.firstName} ${contact.lastName}`.trim()}</td>
                         <td className="p-3">{contact.email || '-'}</td>
-                        <td className="p-3">{contact.phone || '-'}</td>
+                        <td className="p-3">{formatPhoneNumber(contact.phone).formatted }</td>
                         <td className="p-3 max-w-xs">
                           {contact.biography ? (
                             <span className="text-gray-500 text-xs line-clamp-2" title={contact.biography}>

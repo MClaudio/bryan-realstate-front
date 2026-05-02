@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../../services/api';
 import { Save, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { alertError, toastSuccess } from '../../../utils/alerts';
+import { formatPhoneNumber, validatePhoneNumber } from '../../../utils/phoneFormatter';
 
 export const ClientFormPage = () => {
   const { id } = useParams();
@@ -11,8 +12,10 @@ export const ClientFormPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [phoneFormatted, setPhoneFormatted] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({
     defaultValues: {
       firstName: '',
       lastName: '',
@@ -26,6 +29,20 @@ export const ClientFormPage = () => {
       interestDescription: ''
     }
   });
+
+  const phoneValue = watch('phone');
+
+  // Actualizar preview del teléfono formateado en tiempo real
+  useEffect(() => {
+    if (phoneValue && phoneValue.trim()) {
+      const { formatted, isValid } = formatPhoneNumber(phoneValue);
+      setPhoneFormatted(formatted);
+      setPhoneError(isValid ? '' : 'El número debe tener código de país y al menos 7 dígitos');
+    } else {
+      setPhoneFormatted('');
+      setPhoneError('');
+    }
+  }, [phoneValue]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -52,11 +69,26 @@ export const ClientFormPage = () => {
   const onSubmit = async (data: any) => {
     setLoading(true);
     try {
+      // Validar y formatear teléfono
+      if (!data.phone || !data.phone.trim()) {
+        alertError('Error de validación', 'El teléfono es requerido');
+        setLoading(false);
+        return;
+      }
+
+      if (!validatePhoneNumber(data.phone)) {
+        alertError('Error de validación', 'El número telefónico debe tener al menos 7 dígitos y debe incluir código de país');
+        setLoading(false);
+        return;
+      }
+
+      const { formatted: formattedPhone } = formatPhoneNumber(data.phone);
+
       // Prepare payload
       const payload: any = {
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone,
+        phone: formattedPhone,
       };
 
       if (data.email && data.email.trim().length > 0) {
@@ -150,11 +182,18 @@ export const ClientFormPage = () => {
               type="text"
               {...register('phone', { 
                 required: 'El teléfono es requerido',
-                minLength: { value: 10, message: 'Mínimo 10 dígitos' }
+                minLength: { value: 7, message: 'Mínimo 7 dígitos' }
               })}
-              className={`w-full p-2 border rounded-md ${errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+              className={`w-full p-2 border rounded-md ${errors.phone || phoneError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+              placeholder="ej: 0978961341 o +593978961341"
             />
             {errors.phone && <span className="text-red-500 text-xs">{errors.phone.message as string}</span>}
+            {phoneError && <span className="text-red-500 text-xs">{phoneError}</span>}
+            {phoneFormatted && !phoneError && (
+              <span className="text-xs text-green-600 mt-1 block">
+                Formato guardado: <strong>{phoneFormatted}</strong>
+              </span>
+            )}
           </div>
 
           <div>
