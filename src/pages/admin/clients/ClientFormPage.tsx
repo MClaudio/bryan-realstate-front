@@ -4,7 +4,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../../services/api';
 import { Save, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { alertError, toastSuccess } from '../../../utils/alerts';
-import { formatPhoneNumber, validatePhoneNumber } from '../../../utils/phoneFormatter';
+import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
+import {
+  formatPhoneNumber,
+  validatePhoneNumber,
+  PHONE_COUNTRY_OPTIONS,
+} from '../../../utils/phoneFormatter';
 
 export const ClientFormPage = () => {
   const { id } = useParams();
@@ -14,6 +19,7 @@ export const ClientFormPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [phoneFormatted, setPhoneFormatted] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>('EC');
   
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({
     defaultValues: {
@@ -35,14 +41,14 @@ export const ClientFormPage = () => {
   // Actualizar preview del teléfono formateado en tiempo real
   useEffect(() => {
     if (phoneValue && phoneValue.trim()) {
-      const { formatted, isValid } = formatPhoneNumber(phoneValue);
+      const { formatted, isValid } = formatPhoneNumber(phoneValue, selectedCountry);
       setPhoneFormatted(formatted);
       setPhoneError(isValid ? '' : 'El número debe tener código de país y al menos 7 dígitos');
     } else {
       setPhoneFormatted('');
       setPhoneError('');
     }
-  }, [phoneValue]);
+  }, [phoneValue, selectedCountry]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -50,12 +56,19 @@ export const ClientFormPage = () => {
         try {
           const response = await api.get(`/clients/${id}`);
           const { password, birthDate, ...clientData } = response.data;
+
+          const parsedPhone = clientData.phone ? parsePhoneNumberFromString(clientData.phone) : null;
+          const phoneForInput = parsedPhone?.nationalNumber ?? clientData.phone ?? '';
+          if (parsedPhone?.country) {
+            setSelectedCountry(parsedPhone.country as CountryCode);
+          }
           
           // Format date for input type="date"
           const formattedDate = birthDate ? new Date(birthDate).toISOString().split('T')[0] : '';
           
           reset({
             ...clientData,
+            phone: phoneForInput,
             birthDate: formattedDate
           });
         } catch (error) {
@@ -76,13 +89,13 @@ export const ClientFormPage = () => {
         return;
       }
 
-      if (!validatePhoneNumber(data.phone)) {
+      if (!validatePhoneNumber(data.phone, selectedCountry)) {
         alertError('Error de validación', 'El número telefónico debe tener al menos 7 dígitos y debe incluir código de país');
         setLoading(false);
         return;
       }
 
-      const { formatted: formattedPhone } = formatPhoneNumber(data.phone);
+      const { formatted: formattedPhone } = formatPhoneNumber(data.phone, selectedCountry);
 
       // Prepare payload
       const payload: any = {
@@ -178,15 +191,28 @@ export const ClientFormPage = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono *</label>
-            <input
-              type="text"
-              {...register('phone', { 
-                required: 'El teléfono es requerido',
-                minLength: { value: 7, message: 'Mínimo 7 dígitos' }
-              })}
-              className={`w-full p-2 border rounded-md ${errors.phone || phoneError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
-              placeholder="ej: 0978961341 o +593978961341"
-            />
+            <div className="flex gap-2">
+              <select
+                value={selectedCountry}
+                onChange={(event) => setSelectedCountry(event.target.value as CountryCode)}
+                className="w-44 p-2 border rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              >
+                {PHONE_COUNTRY_OPTIONS.map((country) => (
+                  <option key={country.countryCode} value={country.countryCode}>
+                    {country.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                {...register('phone', {
+                  required: 'El teléfono es requerido',
+                  minLength: { value: 7, message: 'Mínimo 7 dígitos' },
+                })}
+                className={`w-full p-2 border rounded-md ${errors.phone || phoneError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+                placeholder="ej: 0978961341"
+              />
+            </div>
             {errors.phone && <span className="text-red-500 text-xs">{errors.phone.message as string}</span>}
             {phoneError && <span className="text-red-500 text-xs">{phoneError}</span>}
             {phoneFormatted && !phoneError && (
