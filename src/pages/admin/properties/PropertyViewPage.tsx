@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../../services/api';
-import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, Clock, ChevronRight as ChevronRightIcon, DollarSign, FileText, User, Briefcase, X, ClipboardList, Plus, Heart, Trash2, Star } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, Clock, ChevronRight as ChevronRightIcon, DollarSign, FileText, User, Briefcase, X, ClipboardList, Plus, Heart, Trash2, Star, Sparkles } from 'lucide-react';
+import { toastError, toastSuccess } from '../../../utils/alerts';
 
 // ─── Interest types ──────────────────────────────────────────────────────────
 type InterestLevel = 'Bajo' | 'Medio' | 'Alto' | 'MuyAlto';
@@ -19,6 +20,31 @@ interface PropertyInterest {
   notes?: string;
   client: ClientSummary;
 }
+
+type RecommendedInterestLevel = 'ALTO' | 'MEDIO' | 'BAJO';
+
+interface RecommendedCandidate {
+  client_id: string;
+  name: string;
+  interest_level: RecommendedInterestLevel;
+  reason: string;
+  score?: number;
+}
+
+const INTEREST_LEVEL_TO_PRISMA: Record<
+  RecommendedInterestLevel,
+  'Alto' | 'Medio' | 'Bajo'
+> = {
+  ALTO: 'Alto',
+  MEDIO: 'Medio',
+  BAJO: 'Bajo',
+};
+
+const RECOMMENDED_LEVEL_BADGE: Record<RecommendedInterestLevel, string> = {
+  ALTO: 'bg-red-100 text-red-700',
+  MEDIO: 'bg-yellow-100 text-yellow-700',
+  BAJO: 'bg-gray-100 text-gray-700',
+};
 
 // ─── Interest Form Modal ──────────────────────────────────────────────────────
 const InterestFormModal = ({
@@ -124,6 +150,99 @@ const InterestFormModal = ({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+const RecommendedCandidatesModal = ({
+  candidates,
+  saving,
+  onRemove,
+  onClose,
+  onSave,
+}: {
+  candidates: RecommendedCandidate[];
+  saving: boolean;
+  onRemove: (clientId: string) => void;
+  onClose: () => void;
+  onSave: () => Promise<void>;
+}) => {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-full bg-blue-100">
+              <Sparkles size={18} className="text-blue-700" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Clientes recomendados por IA</h2>
+              <p className="text-sm text-gray-500">Revisa la lista, elimina los que no apliquen y guarda.</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            disabled={saving}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-3">
+          {candidates.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
+              No quedan candidatos en la lista.
+            </div>
+          ) : (
+            candidates.map((candidate) => (
+              <div key={candidate.client_id} className="rounded-xl border border-gray-200 p-4">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-900">{candidate.name}</p>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-semibold ${RECOMMENDED_LEVEL_BADGE[candidate.interest_level]}`}
+                      >
+                        {candidate.interest_level}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700">{candidate.reason}</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onRemove(candidate.client_id)}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm border border-red-200 text-red-600 hover:bg-red-50"
+                    disabled={saving}
+                  >
+                    <Trash2 size={14} /> Eliminar
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="p-5 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Omitir por ahora
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving || candidates.length === 0}
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300"
+          >
+            {saving ? 'Guardando...' : 'Guardar interesados'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -278,6 +397,10 @@ export const PropertyViewPage = () => {
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [showInterestForm, setShowInterestForm] = useState(false);
   const [deletingInterestId, setDeletingInterestId] = useState<string | null>(null);
+  const [showRecommendationsModal, setShowRecommendationsModal] = useState(false);
+  const [recommendedCandidates, setRecommendedCandidates] = useState<RecommendedCandidate[]>([]);
+  const [savingRecommendations, setSavingRecommendations] = useState(false);
+  const [runningRecommendations, setRunningRecommendations] = useState(false);
 
   const extractCoordsFromUrl = (url: string): { lat: number; lng: number } | null => {
     // For place URLs, use the LAST !3d!4d pair (actual place pin, not viewport or nearby results)
@@ -374,6 +497,102 @@ export const PropertyViewPage = () => {
       const res = await api.get('/clients');
       setClients(res.data.map((c: any) => ({ id: c.id, firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone })));
     } catch { /* non-critical */ }
+  };
+
+  const normalizeRecommendedCandidates = (payload: any): RecommendedCandidate[] => {
+    if (!Array.isArray(payload)) return [];
+
+    return payload
+      .map((item) => {
+        const rawLevel = String(item?.interest_level ?? '').toUpperCase();
+        const normalizedLevel: RecommendedInterestLevel =
+          rawLevel === 'ALTO' ? 'ALTO' : rawLevel === 'BAJO' ? 'BAJO' : 'MEDIO';
+
+        return {
+          client_id: String(item?.client_id ?? '').trim(),
+          name: String(item?.name ?? '').trim(),
+          interest_level: normalizedLevel,
+          reason: String(item?.reason ?? '').trim(),
+          score:
+            item?.score !== undefined && !Number.isNaN(Number(item.score))
+              ? Number(item.score)
+              : undefined,
+        };
+      })
+      .filter((item) => item.client_id && item.name && item.reason);
+  };
+
+  const handleRemoveCandidate = (clientId: string) => {
+    setRecommendedCandidates((prev) => prev.filter((candidate) => candidate.client_id !== clientId));
+  };
+
+  const refreshInterests = async () => {
+    if (!id) return;
+    try {
+      const intRes = await api.get(`/property-interests?propertyId=${id}`);
+      setInterests(intRes.data);
+    } catch {
+      // non-critical
+    }
+  };
+
+  const handleRunManualRecommendations = async () => {
+    if (!id) return;
+    try {
+      setRunningRecommendations(true);
+      const response = await api.post(`/properties/${id}/recommendations`);
+      const candidates = normalizeRecommendedCandidates(response?.data?.recommendedCandidates);
+
+      if (candidates.length === 0) {
+        toastError('No se encontraron candidatos recomendados para este inmueble.');
+        return;
+      }
+
+      setRecommendedCandidates(candidates);
+      setShowRecommendationsModal(true);
+    } catch (error) {
+      toastError('No se pudo ejecutar la recomendación manual.');
+    } finally {
+      setRunningRecommendations(false);
+    }
+  };
+
+  const handleSaveRecommendedCandidates = async () => {
+    if (!id) return;
+
+    try {
+      setSavingRecommendations(true);
+      const today = new Date().toISOString().split('T')[0];
+
+      const results = await Promise.allSettled(
+        recommendedCandidates.map((candidate) =>
+          api.post('/property-interests', {
+            propertyId: id,
+            clientId: candidate.client_id,
+            interestDate: today,
+            interestLevel: INTEREST_LEVEL_TO_PRISMA[candidate.interest_level],
+            notes: candidate.reason,
+          }),
+        ),
+      );
+
+      const successCount = results.filter((result) => result.status === 'fulfilled').length;
+
+      if (successCount > 0) {
+        toastSuccess(`Se guardaron ${successCount} interesado(s) recomendados.`);
+      }
+      if (successCount !== recommendedCandidates.length) {
+        toastError('Algunos interesados no pudieron guardarse.');
+      }
+
+      setShowRecommendationsModal(false);
+      setRecommendedCandidates([]);
+      await refreshInterests();
+    } catch {
+      toastError('No se pudo guardar la lista de interesados recomendados.');
+    } finally {
+      setSavingRecommendations(false);
+    }
   };
 
   const handleDeleteInterest = async (iid: string) => {
@@ -512,12 +731,22 @@ export const PropertyViewPage = () => {
                     <span className="ml-1 text-sm font-normal text-gray-400">({interests.length})</span>
                   )}
                 </h3>
-                <button
-                  onClick={() => { loadClients(); setShowInterestForm(true); }}
-                  className="inline-flex items-center gap-1.5 text-sm text-pink-600 hover:text-pink-700 font-medium"
-                >
-                  <Plus size={15} /> Registrar interés
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleRunManualRecommendations}
+                    disabled={runningRecommendations}
+                    className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                  >
+                    <Sparkles size={15} />
+                    {runningRecommendations ? 'Ejecutando IA...' : 'Ejecutar recomendación IA'}
+                  </button>
+                  <button
+                    onClick={() => { loadClients(); setShowInterestForm(true); }}
+                    className="inline-flex items-center gap-1.5 text-sm text-pink-600 hover:text-pink-700 font-medium"
+                  >
+                    <Plus size={15} /> Registrar interés
+                  </button>
+                </div>
               </div>
 
               {interests.length === 0 ? (
@@ -718,6 +947,16 @@ export const PropertyViewPage = () => {
           clients={clients}
           onClose={() => setShowInterestForm(false)}
           onSaved={(item) => setInterests(prev => [item, ...prev])}
+        />
+      )}
+
+      {showRecommendationsModal && (
+        <RecommendedCandidatesModal
+          candidates={recommendedCandidates}
+          saving={savingRecommendations}
+          onRemove={handleRemoveCandidate}
+          onClose={() => setShowRecommendationsModal(false)}
+          onSave={handleSaveRecommendedCandidates}
         />
       )}
     </div>
