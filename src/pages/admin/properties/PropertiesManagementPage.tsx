@@ -16,6 +16,7 @@ import {
 import api from "../../../services/api";
 import { Link } from "react-router-dom";
 import { alertConfirm, alertError, toastSuccess } from "../../../utils/alerts";
+import { PROPERTY_STATUS_LABELS, PROPERTY_STATUS_COLORS } from "../../../utils/propertyEnums";
 
 interface Property {
   id: string;
@@ -141,7 +142,7 @@ export const PropertiesManagementPage = () => {
     "Finca",
     "Lote",
   ];
-  const propertyStatuses = ["En Venta", "Negociación", "Vendido"];
+  const propertyStatuses = ["Nuevo", "Negociacion", "Vendido"];
 
   return (
     <div className="space-y-6">
@@ -209,7 +210,7 @@ export const PropertiesManagementPage = () => {
               <option value="">Todos los estados</option>
               {propertyStatuses.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {PROPERTY_STATUS_LABELS[status] ?? status}
                 </option>
               ))}
             </select>
@@ -303,15 +304,9 @@ export const PropertiesManagementPage = () => {
                     </span>
                   )}
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      property.status === "En Venta"
-                        ? "bg-green-100 text-green-700"
-                        : property.status === "Vendido"
-                          ? "bg-gray-100 text-gray-700"
-                          : "bg-yellow-100 text-yellow-700"
-                    }`}
+                    className={`px-2 py-1 rounded-full text-xs font-semibold ${PROPERTY_STATUS_COLORS[property.status] ?? 'bg-gray-100 text-gray-700'}`}
                   >
-                    {property.status}
+                    {PROPERTY_STATUS_LABELS[property.status] ?? property.status}
                   </span>
                 </div>
 

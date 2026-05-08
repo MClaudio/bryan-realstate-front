@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { Search, MapPin, Building, Filter } from 'lucide-react';
+import { PROPERTY_STATUS_LABELS, PROPERTY_STATUS_COLORS } from '../../utils/propertyEnums';
 
 interface Property {
   id: string;
@@ -88,9 +89,9 @@ export const PropertiesPage = () => {
                 </select>
                 <select className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">Estado</option>
-                  <option>En Venta</option>
-                  <option>Negociación</option>
-                  <option>Vendido</option>
+                  <option value="Nuevo">En Venta</option>
+                  <option value="Negociacion">Negociación</option>
+                  <option value="Vendido">Vendido</option>
                 </select>
                 <input type="number" placeholder="Precio mínimo" className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 <input type="number" placeholder="Precio máximo" className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -153,12 +154,8 @@ export const PropertiesPage = () => {
                       <Building size={16} className="text-gray-500" />
                       <span className="text-sm text-gray-600">{Number(property.constructionArea)} m²</span>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      property.status === 'En Venta' ? 'bg-green-100 text-green-700' :
-                      property.status === 'Vendido' ? 'bg-gray-100 text-gray-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {property.status}
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${PROPERTY_STATUS_COLORS[property.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                      {PROPERTY_STATUS_LABELS[property.status] ?? property.status}
                     </span>
                   </div>
                   
