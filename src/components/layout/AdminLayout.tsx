@@ -14,18 +14,30 @@ import {
   ChevronDown,
   Home,
   ShieldX,
-  UserCircle
+  UserCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
+import Swal from 'sweetalert2';
+import { io, type Socket } from 'socket.io-client';
 
 interface AppConfig {
   businessName: string | null;
   logo?: { id: string; path: string } | null;
 }
 
+interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  path?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export const AdminLayout = () => {
-  const { logout, user } = useAuth();
+  const { logout, user, token } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -34,6 +46,96 @@ export const AdminLayout = () => {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingUnread, setLoadingUnread] = useState(false);
+
+  const fetchUnreadNotifications = async () => {
+    try {
+      setLoadingUnread(true);
+      const res = await api.get('/notifications?unreadOnly=true&limit=20');
+      const items = Array.isArray(res.data) ? (res.data as NotificationItem[]) : [];
+      setUnreadNotifications(items);
+      setUnreadCount(items.length);
+    } catch {
+      // non-critical
+    } finally {
+      setLoadingUnread(false);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      await api.patch(`/notifications/${notificationId}/read`);
+      setUnreadNotifications((prev) => prev.filter((item) => item.id !== notificationId));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {
+      // non-critical
+    }
+  };
+
+  const handleNotificationClick = async (notification: NotificationItem) => {
+    await markNotificationAsRead(notification.id);
+    setNotificationsOpen(false);
+
+    if (notification.path) {
+      navigate(`${notification.path}?notificationId=${notification.id}`);
+    }
+  };
+
+  const openNotifications = async () => {
+    setNotificationsOpen(true);
+    await fetchUnreadNotifications();
+  };
+
+  useEffect(() => {
+    if (!token) return;
+
+    const apiBase = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
+    const socketBaseUrl = String(apiBase).replace(/\/api\/?$/, '');
+
+    const socket: Socket = io(`${socketBaseUrl}/notifications`, {
+      transports: ['websocket'],
+      auth: {
+        token,
+      },
+    });
+
+    socket.on('notification.created', async (notification: NotificationItem) => {
+      window.dispatchEvent(
+        new CustomEvent('app:notification', { detail: notification }),
+      );
+
+      setUnreadNotifications((prev) => [notification, ...prev].slice(0, 20));
+      setUnreadCount((prev) => prev + 1);
+
+      const result = await Swal.fire({
+        title: notification?.title || 'Nueva notificación',
+        text: notification?.message || '',
+        icon: 'info',
+        toast: true,
+        position: 'top-end',
+        timer: 10000,
+        timerProgressBar: true,
+        showConfirmButton: !!notification?.path,
+        confirmButtonText: 'Ver',
+        showCloseButton: true,
+      });
+
+      if (result.isConfirmed && notification?.path) {
+        await markNotificationAsRead(notification.id);
+        const target = notification?.id
+          ? `${notification.path}?notificationId=${notification.id}`
+          : notification.path;
+        navigate(target);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [navigate, token]);
 
   // Fetch company configuration once on mount
   useEffect(() => {
@@ -52,6 +154,11 @@ export const AdminLayout = () => {
     };
     fetchConfig();
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    fetchUnreadNotifications();
+  }, [token]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -112,6 +219,14 @@ export const AdminLayout = () => {
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Notifications Overlay */}
+      {notificationsOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 z-40"
+          onClick={() => setNotificationsOpen(false)}
         />
       )}
 
@@ -249,8 +364,16 @@ export const AdminLayout = () => {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <button
+              onClick={openNotifications}
+              className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
               <Bell className="w-5 h-5 text-gray-600" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[10px] leading-5 font-bold text-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </button>
           </div>
         </header>
@@ -260,6 +383,67 @@ export const AdminLayout = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* Notifications Sidebar */}
+      <aside
+        className={`fixed right-0 top-0 h-full w-full sm:w-[420px] bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300 ${
+          notificationsOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="h-16 px-5 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Notificaciones</h3>
+            <p className="text-xs text-gray-500">No leídas</p>
+          </div>
+          <button
+            onClick={() => setNotificationsOpen(false)}
+            className="p-2 rounded-lg hover:bg-gray-100"
+          >
+            <X className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+
+        <div className="p-4 border-b border-gray-100">
+          <button
+            onClick={() => {
+              setNotificationsOpen(false);
+              navigate('/admin/notificaciones');
+            }}
+            className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            <ExternalLink className="w-4 h-4" /> Ver todo
+          </button>
+        </div>
+
+        <div className="h-[calc(100%-8.5rem)] overflow-y-auto p-4 space-y-3">
+          {loadingUnread ? (
+            <p className="text-sm text-gray-500">Cargando notificaciones...</p>
+          ) : unreadNotifications.length === 0 ? (
+            <div className="text-center py-10 text-sm text-gray-500 border border-dashed rounded-lg">
+              No tienes notificaciones no leídas.
+            </div>
+          ) : (
+            unreadNotifications.map((notification) => (
+              <button
+                key={notification.id}
+                onClick={() => handleNotificationClick(notification)}
+                className="w-full text-left rounded-xl border border-gray-200 bg-blue-50/40 hover:bg-blue-50 p-4 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900">{notification.title}</h4>
+                    <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                  </div>
+                  <span className="mt-1 inline-block w-2.5 h-2.5 rounded-full bg-blue-600" />
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  {new Date(notification.createdAt).toLocaleString('es-EC')}
+                </p>
+              </button>
+            ))
+          )}
+        </div>
+      </aside>
     </div>
   );
 };

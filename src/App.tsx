@@ -25,6 +25,7 @@ import { FilesManagementPage } from './pages/admin/files/FilesManagementPage';
 import { BlacklistManagementPage } from './pages/admin/blacklist/BlacklistManagementPage';
 import { BlacklistFormPage } from './pages/admin/blacklist/BlacklistFormPage';
 import { ProfilePage } from './pages/admin/ProfilePage';
+import { NotificationsPage } from './pages/admin/NotificationsPage';
 
 function App() {
   return (
@@ -69,6 +70,7 @@ function App() {
               <Route path="/admin/propiedades/procesos/:propertyId" element={<ProcessesPage />} />
               
               <Route path="/admin/archivos" element={<FilesManagementPage />} />
+              <Route path="/admin/notificaciones" element={<NotificationsPage />} />
               <Route path="/admin/configuracion" element={<ConfigurationPage />} />
 
               {/* Blacklist Routes */}

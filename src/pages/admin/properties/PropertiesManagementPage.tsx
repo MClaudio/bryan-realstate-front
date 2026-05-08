@@ -32,6 +32,8 @@ interface Property {
   };
   createdAt: string;
   files: Array<{
+    sortOrder?: number;
+    createdAt?: string;
     file: {
       id: string;
       path: string;
@@ -101,9 +103,21 @@ export const PropertiesManagementPage = () => {
     const apiBase =
       (import.meta as any).env?.VITE_API_URL || "http://localhost:3000/api";
     const base = String(apiBase).replace(/\/$/, "");
-    const firstImage = property.files?.find(
-      (pf) => pf.fileType === "image",
-    )?.file;
+
+    const firstImage = property.files
+      ?.filter((pf) => pf.fileType === "image")
+      .sort((a, b) => {
+        const orderA = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+
+        if (orderA !== orderB) return orderA - orderB;
+
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+        return dateA - dateB;
+      })[0]?.file;
+
     return firstImage
       ? `${base}/public/files/${firstImage.id}`
       : "https://images.unsplash.com/photo-1600596542815-27b5c0b8aa2b?auto=format&fit=crop&w=200&q=80";
@@ -127,7 +141,7 @@ export const PropertiesManagementPage = () => {
     "Finca",
     "Lote",
   ];
-  const propertyStatuses = ["Nuevo", "Negociación", "Vendido"];
+  const propertyStatuses = ["En Venta", "Negociación", "Vendido"];
 
   return (
     <div className="space-y-6">
@@ -290,7 +304,7 @@ export const PropertiesManagementPage = () => {
                   )}
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      property.status === "Nuevo"
+                      property.status === "En Venta"
                         ? "bg-green-100 text-green-700"
                         : property.status === "Vendido"
                           ? "bg-gray-100 text-gray-700"
