@@ -165,8 +165,8 @@ export const PropertyFormPage = () => {
   const [loading, setLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [_property, setProperty] = useState<Property | null>(null);
-  const [fileIds, setFileIds] = useState<string[]>([]);
-  const [documentFileIds, setDocumentFileIds] = useState<string[]>([]);
+  const fileIdsRef = useRef<string[]>([]);
+  const documentFileIdsRef = useRef<string[]>([]);
   const [initialImageFiles, setInitialImageFiles] = useState<{ id: string; url: string; name: string; size?: number }[]>([]);
   const [initialDocumentFiles, setInitialDocumentFiles] = useState<{ id: string; url: string; name: string; size?: number }[]>([]);
   const [advisors, setAdvisors] = useState<Array<{id: string; firstName: string; lastName: string}>>([]);
@@ -193,7 +193,7 @@ export const PropertyFormPage = () => {
       address: '',
       price: 0,
       propertyType: 'Casa',
-      status: 'Nuevo',
+      status: 'En Venta',
       advisorId: '',
       constructionArea: 0,
       landArea: 0,
@@ -310,14 +310,18 @@ export const PropertyFormPage = () => {
   }, []);
 
   // Memoize file upload callbacks to prevent FileUpload re-renders
-  const handleImageFilesChange = useCallback((files: Array<{ id: string }>) => {
+  const handleImageFilesChange = useCallback((files: Array<{ id: string; url: string; name: string; size?: number }>) => {
     console.log('Image files changed:', files);
-    setFileIds(files.map(f => f.id).filter(id => id && id.length === 36));
+    const orderedIds = files.map(f => f.id).filter(id => id && id.length === 36);
+    fileIdsRef.current = orderedIds;
+    setInitialImageFiles(files);
   }, []);
 
-  const handleDocumentFilesChange = useCallback((files: Array<{ id: string }>) => {
+  const handleDocumentFilesChange = useCallback((files: Array<{ id: string; url: string; name: string; size?: number }>) => {
     console.log('Document files changed:', files);
-    setDocumentFileIds(files.map(f => f.id).filter(id => id && id.length === 36));
+    const orderedIds = files.map(f => f.id).filter(id => id && id.length === 36);
+    documentFileIdsRef.current = orderedIds;
+    setInitialDocumentFiles(files);
   }, []);
 
   // Fetch advisors only once on mount
@@ -381,7 +385,9 @@ export const PropertyFormPage = () => {
         setShowBasicServices(propertyData.hasBasicServices);
 
         // Set file IDs and fetch URLs for existing files
-        const imageFiles = propertyData.files?.filter((f: {fileType: string; file: {id: string}}) => f?.fileType === 'image' && f?.file?.id) || [];
+        const imageFiles = propertyData.files
+          ?.filter((f: {fileType: string; file: {id: string}; sortOrder?: number}) => f?.fileType === 'image' && f?.file?.id)
+          ?.sort((a: {sortOrder?: number}, b: {sortOrder?: number}) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)) || [];
         const documentFiles = propertyData.files?.filter((f: {fileType: string; file: {id: string}}) => f?.fileType === 'document' && f?.file?.id) || [];
         
         // Fetch actual URLs for the files
@@ -428,8 +434,10 @@ export const PropertyFormPage = () => {
 
         setInitialImageFiles(imageFilesList);
         setInitialDocumentFiles(documentFilesList);
-        setFileIds(imageFilesList.map(f => f.id).filter(id => id && id.length === 36));
-        setDocumentFileIds(documentFilesList.map(f => f.id).filter(id => id && id.length === 36));
+        const initialImageIds = imageFilesList.map(f => f.id).filter(id => id && id.length === 36);
+        const initialDocumentIds = documentFilesList.map(f => f.id).filter(id => id && id.length === 36);
+        fileIdsRef.current = initialImageIds;
+        documentFileIdsRef.current = initialDocumentIds;
         
         // Update property with files that have URLs
         setProperty({
@@ -529,8 +537,8 @@ export const PropertyFormPage = () => {
       
       const payload = {
         ...data,
-        fileIds: fileIds.filter(id => id && id.length === 36) || [],
-        documentFileIds: documentFileIds.filter(id => id && id.length === 36) || [],
+        fileIds: fileIdsRef.current.filter(id => id && id.length === 36) || [],
+        documentFileIds: documentFileIdsRef.current.filter(id => id && id.length === 36) || [],
         // Send negotiationClientId when status is Negociación or Vendido; clear it otherwise
         negotiationClientId: (data.status === 'Negociación' || data.status === 'Vendido') && data.negotiationClientId
           ? data.negotiationClientId
@@ -548,6 +556,12 @@ export const PropertyFormPage = () => {
 
       console.log(isEditMode ? 'Update response:' : 'Create response:', response.data);
       toastSuccess(isEditMode ? 'Propiedad actualizada exitosamente' : 'Propiedad creada exitosamente');
+
+      if (response?.data?.recommendationQueued) {
+        toastSuccess('La recomendación IA se está procesando en segundo plano.');
+        navigate('/admin/propiedades/gestion');
+        return;
+      }
 
       const persistedPropertyId = response?.data?.id || id || null;
       setSavedPropertyId(persistedPropertyId);
@@ -612,7 +626,7 @@ export const PropertyFormPage = () => {
   // Memoize status options
   const statusOptions = useMemo(() => (
     <>
-      <option value="Nuevo">Nuevo</option>
+      <option value="En Venta">En Venta</option>
       <option value="Negociación">Negociación</option>
       <option value="Vendido">Vendido</option>
     </>
@@ -1125,6 +1139,7 @@ export const PropertyFormPage = () => {
                 accept="image/*"
                 multiple
                 showPreview={true}
+                allowReorder={true}
               />
             </div>
 

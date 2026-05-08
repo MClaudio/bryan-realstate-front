@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../../services/api';
 import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, Clock, ChevronRight as ChevronRightIcon, DollarSign, FileText, User, Briefcase, X, ClipboardList, Plus, Heart, Trash2, Star, Sparkles } from 'lucide-react';
 import { toastError, toastSuccess } from '../../../utils/alerts';
@@ -30,6 +30,19 @@ interface RecommendedCandidate {
   reason: string;
   score?: number;
 }
+
+interface RecommendationNotification {
+  id: string;
+  path?: string | null;
+  modalKey?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  payload?: {
+    candidates?: unknown[];
+  };
+}
+
+const RECOMMENDATION_MODAL_KEY = 'property-interested-candidates';
 
 const INTEREST_LEVEL_TO_PRISMA: Record<
   RecommendedInterestLevel,
@@ -386,6 +399,8 @@ const ProcessDetailModal = ({ process, onClose }: { process: Process; onClose: (
 
 export const PropertyViewPage = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(0);
@@ -499,7 +514,7 @@ export const PropertyViewPage = () => {
     } catch { /* non-critical */ }
   };
 
-  const normalizeRecommendedCandidates = (payload: any): RecommendedCandidate[] => {
+  const normalizeRecommendedCandidates = useCallback((payload: any): RecommendedCandidate[] => {
     if (!Array.isArray(payload)) return [];
 
     return payload
@@ -520,7 +535,78 @@ export const PropertyViewPage = () => {
         };
       })
       .filter((item) => item.client_id && item.name && item.reason);
-  };
+  }, []);
+
+  const applyRecommendationNotification = useCallback(async (
+    notification: RecommendationNotification,
+  ) => {
+    if (!id) return;
+    if (notification.entityType !== 'property') return;
+    if (String(notification.entityId ?? '') !== String(id)) return;
+
+    const candidates = normalizeRecommendedCandidates(
+      notification.payload?.candidates,
+    );
+
+    if (
+      notification.modalKey === RECOMMENDATION_MODAL_KEY &&
+      candidates.length > 0
+    ) {
+      setRecommendedCandidates(candidates);
+      setShowRecommendationsModal(true);
+    }
+
+    if (notification.id) {
+      try {
+        await api.patch(`/notifications/${notification.id}/read`);
+      } catch {
+        // non-critical
+      }
+    }
+  }, [id, normalizeRecommendedCandidates]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const notificationId = params.get('notificationId');
+
+    if (!notificationId || !id) {
+      return;
+    }
+
+    const loadNotification = async () => {
+      try {
+        const res = await api.get(`/notifications/${notificationId}`);
+        await applyRecommendationNotification(res.data as RecommendationNotification);
+      } catch {
+        // non-critical
+      } finally {
+        navigate(location.pathname, { replace: true });
+      }
+    };
+
+    loadNotification();
+  }, [
+    applyRecommendationNotification,
+    id,
+    location.pathname,
+    location.search,
+    navigate,
+  ]);
+
+  useEffect(() => {
+    const onNotification = (event: Event) => {
+      const customEvent = event as CustomEvent<RecommendationNotification>;
+      if (!customEvent?.detail) return;
+
+      applyRecommendationNotification(customEvent.detail);
+    };
+
+    window.addEventListener('app:notification', onNotification as EventListener);
+
+    return () => {
+      window.removeEventListener('app:notification', onNotification as EventListener);
+    };
+  }, [applyRecommendationNotification]);
 
   const handleRemoveCandidate = (clientId: string) => {
     setRecommendedCandidates((prev) => prev.filter((candidate) => candidate.client_id !== clientId));
@@ -541,6 +627,12 @@ export const PropertyViewPage = () => {
     try {
       setRunningRecommendations(true);
       const response = await api.post(`/properties/${id}/recommendations`);
+
+      if (response?.data?.recommendationQueued) {
+        toastSuccess('La recomendación IA se está procesando en segundo plano.');
+        return;
+      }
+
       const candidates = normalizeRecommendedCandidates(response?.data?.recommendedCandidates);
 
       if (candidates.length === 0) {

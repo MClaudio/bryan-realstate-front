@@ -18,15 +18,26 @@ interface FileUploadProps {
   title?: string;
   showPreview?: boolean;
   displayMode?: 'grid' | 'list';
+  allowReorder?: boolean;
 }
 
-const FileUploadComponent = ({ onFilesChange, initialFiles = [], multiple = true, accept = 'image/*', title, showPreview = true, displayMode = 'grid' }: FileUploadProps) => {
+const FileUploadComponent = ({
+  onFilesChange,
+  initialFiles = [],
+  multiple = true,
+  accept = 'image/*',
+  title,
+  showPreview = true,
+  displayMode = 'grid',
+  allowReorder = false,
+}: FileUploadProps) => {
   const [uploadedFiles, setUploadedFiles] = useState<FileData[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Serialize initialFiles to track meaningful changes
-  const initialFilesKey = JSON.stringify(initialFiles.map(f => f.id).sort());
+  const initialFilesKey = JSON.stringify(initialFiles.map((f) => f.id));
 
   useEffect(() => {
     // Update when initialFiles changes (based on file IDs)
@@ -118,6 +129,26 @@ const FileUploadComponent = ({ onFilesChange, initialFiles = [], multiple = true
     document.body.removeChild(link);
   };
 
+  const moveFile = (fromId: string, toId: string) => {
+    if (!fromId || !toId || fromId === toId) return;
+
+    setUploadedFiles((prevFiles) => {
+      const fromIndex = prevFiles.findIndex((f) => f.id === fromId);
+      const toIndex = prevFiles.findIndex((f) => f.id === toId);
+
+      if (fromIndex < 0 || toIndex < 0) return prevFiles;
+
+      const reordered = [...prevFiles];
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, moved);
+
+      onFilesChange(reordered);
+      return reordered;
+    });
+  };
+
+  const canReorder = allowReorder && displayMode === 'grid' && uploadedFiles.length > 1;
+
   return (
     <div className="space-y-4">
       <div 
@@ -152,12 +183,40 @@ const FileUploadComponent = ({ onFilesChange, initialFiles = [], multiple = true
         displayMode === 'grid' ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {uploadedFiles.map((file) => (
-              <div key={file.id} className="relative group bg-gray-100 rounded-lg overflow-hidden aspect-square">
+              <div
+                key={file.id}
+                className={`relative group bg-gray-100 rounded-lg overflow-hidden aspect-square ${canReorder ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                draggable={canReorder}
+                onDragStart={(e) => {
+                  setDraggedFileId(file.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', file.id);
+                }}
+                onDragOver={(e) => {
+                  if (!canReorder) return;
+                  e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  if (!canReorder) return;
+                  e.preventDefault();
+                  const sourceId = draggedFileId || e.dataTransfer.getData('text/plain');
+                  if (!sourceId) return;
+                  moveFile(sourceId, file.id);
+                  setDraggedFileId(null);
+                }}
+                onDragEnd={() => setDraggedFileId(null)}
+              >
                 {isImage(file.name) ? (
                   <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="flex items-center justify-center h-full">
                     <FileIcon className="h-8 w-8 text-gray-400" />
+                  </div>
+                )}
+
+                {canReorder && (
+                  <div className="absolute top-2 left-2 bg-white/90 text-gray-800 text-xs font-semibold rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
+                    {uploadedFiles.findIndex((f) => f.id === file.id) + 1}
                   </div>
                 )}
                 
@@ -209,6 +268,10 @@ const FileUploadComponent = ({ onFilesChange, initialFiles = [], multiple = true
           </div>
         )
       )}
+
+      {canReorder && (
+        <p className="text-xs text-gray-500">Arrastra las imágenes para definir el orden de visualización.</p>
+      )}
     </div>
   );
 };
@@ -216,8 +279,8 @@ const FileUploadComponent = ({ onFilesChange, initialFiles = [], multiple = true
 // Custom comparison function for memo to prevent unnecessary re-renders
 const arePropsEqual = (prevProps: FileUploadProps, nextProps: FileUploadProps) => {
   // Compare initialFiles by IDs only
-  const prevIds = prevProps.initialFiles?.map(f => f.id).sort().join(',') || '';
-  const nextIds = nextProps.initialFiles?.map(f => f.id).sort().join(',') || '';
+  const prevIds = prevProps.initialFiles?.map((f) => f.id).join(',') || '';
+  const nextIds = nextProps.initialFiles?.map((f) => f.id).join(',') || '';
   
   return (
     prevProps.onFilesChange === nextProps.onFilesChange &&
@@ -226,7 +289,8 @@ const arePropsEqual = (prevProps: FileUploadProps, nextProps: FileUploadProps) =
     prevProps.accept === nextProps.accept &&
     prevProps.title === nextProps.title &&
     prevProps.showPreview === nextProps.showPreview &&
-    prevProps.displayMode === nextProps.displayMode
+    prevProps.displayMode === nextProps.displayMode &&
+    prevProps.allowReorder === nextProps.allowReorder
   );
 };
 
