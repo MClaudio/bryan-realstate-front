@@ -193,7 +193,7 @@ export const PropertyFormPage = () => {
       address: '',
       price: 0,
       propertyType: 'Casa',
-      status: 'En Venta',
+      status: 'Nuevo',
       advisorId: '',
       constructionArea: 0,
       landArea: 0,
@@ -626,8 +626,8 @@ export const PropertyFormPage = () => {
   // Memoize status options
   const statusOptions = useMemo(() => (
     <>
-      <option value="En Venta">En Venta</option>
-      <option value="Negociación">Negociación</option>
+      <option value="Nuevo">En Venta</option>
+      <option value="Negociacion">Negociación</option>
       <option value="Vendido">Vendido</option>
     </>
   ), []);
