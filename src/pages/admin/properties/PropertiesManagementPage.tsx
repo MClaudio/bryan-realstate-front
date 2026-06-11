@@ -16,17 +16,26 @@ import {
 import api from "../../../services/api";
 import { Link } from "react-router-dom";
 import { alertConfirm, alertError, toastSuccess } from "../../../utils/alerts";
-import { PROPERTY_STATUS_LABELS, PROPERTY_STATUS_COLORS } from "../../../utils/propertyEnums";
+import {
+  PROPERTY_STATUS_LABELS,
+  PROPERTY_STATUS_COLORS,
+} from "../../../utils/propertyEnums";
 
 interface Property {
   id: string;
   code: string;
   address: string;
+  cityId?: string | null;
+  referenceSector?: string | null;
   price: number;
   propertyType: string;
   status: string;
   isFeatured: boolean;
   isActive: boolean;
+  city?: {
+    id: string;
+    name: string;
+  } | null;
   advisor: {
     firstName: string;
     lastName: string;
@@ -87,8 +96,6 @@ export const PropertiesManagementPage = () => {
     }
   };
 
-
-
   const toggleActive = async (id: string, currentStatus: boolean) => {
     try {
       await api.patch(`/properties/${id}`, { isActive: !currentStatus });
@@ -127,7 +134,11 @@ export const PropertiesManagementPage = () => {
   const filteredProperties = properties.filter((property) => {
     const matchesSearch =
       property.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.address.toLowerCase().includes(searchTerm.toLowerCase());
+      property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      property.city?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      property.referenceSector
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase());
     const matchesStatus = !statusFilter || property.status === statusFilter;
     const matchesType = !typeFilter || property.propertyType === typeFilter;
 
@@ -142,7 +153,7 @@ export const PropertiesManagementPage = () => {
     "Finca",
     "Lote",
   ];
-  const propertyStatuses = ["Nuevo", "Negociacion", "Vendido"];
+  const propertyStatuses = ["Validacion", "Nuevo", "Negociacion", "Vendido"];
 
   return (
     <div className="space-y-6">
@@ -304,7 +315,7 @@ export const PropertiesManagementPage = () => {
                     </span>
                   )}
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${PROPERTY_STATUS_COLORS[property.status] ?? 'bg-gray-100 text-gray-700'}`}
+                    className={`px-2 py-1 rounded-full text-xs font-semibold ${PROPERTY_STATUS_COLORS[property.status] ?? "bg-gray-100 text-gray-700"}`}
                   >
                     {PROPERTY_STATUS_LABELS[property.status] ?? property.status}
                   </span>
@@ -344,6 +355,13 @@ export const PropertiesManagementPage = () => {
                     <p className="text-sm text-gray-600 truncate">
                       {property.address}
                     </p>
+                    {(property.city?.name || property.referenceSector) && (
+                      <p className="text-xs text-gray-500 truncate">
+                        {[property.city?.name, property.referenceSector]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    )}
                   </div>
                   <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
                     {property.propertyType}

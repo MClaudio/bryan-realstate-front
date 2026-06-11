@@ -4,15 +4,17 @@ import {
   Building2,
   UserCheck,
   DollarSign,
-  Eye,
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
   BarChart3,
   PieChart,
+  X,
 } from "lucide-react";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { Link } from "react-router-dom";
+import { PROPERTY_STATUS_LABELS } from "../../utils/propertyEnums";
 
 interface DashboardData {
   counters: {
@@ -60,6 +62,49 @@ interface DashboardData {
   }>;
 }
 
+type DashboardModalType =
+  | "properties"
+  | "publicProperties"
+  | "clients"
+  | "users"
+  | "statusProperties";
+
+interface DashboardPropertyListItem {
+  id: string;
+  code: string;
+  address: string;
+  price: string | number;
+  status: string;
+  propertyType: string;
+  isPublic?: boolean;
+}
+
+interface DashboardClientListItem {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  phone: string;
+}
+
+interface DashboardUserListItem {
+  id: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  type: string;
+  isActive?: boolean;
+}
+
+const MODAL_TITLES: Record<DashboardModalType, string> = {
+  properties: "Total Propiedades",
+  publicProperties: "Propiedades Públicas",
+  clients: "Clientes Activos",
+  users: "Usuarios Sistema",
+  statusProperties: "Propiedades por Estado",
+};
+
 export const DashboardPage = () => {
   const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
@@ -68,6 +113,17 @@ export const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRange] = useState("7d");
+  const [activeModal, setActiveModal] = useState<DashboardModalType | null>(
+    null,
+  );
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [propertyList, setPropertyList] = useState<DashboardPropertyListItem[]>(
+    [],
+  );
+  const [clientList, setClientList] = useState<DashboardClientListItem[]>([]);
+  const [userList, setUserList] = useState<DashboardUserListItem[]>([]);
+  const [selectedStatusLabel, setSelectedStatusLabel] = useState<string>("");
 
   useEffect(() => {
     fetchDashboardData();
@@ -109,6 +165,71 @@ export const DashboardPage = () => {
     return `$${num.toLocaleString()}`;
   };
 
+  const closeModal = () => {
+    setActiveModal(null);
+    setModalError(null);
+    setSelectedStatusLabel("");
+  };
+
+  const openDashboardModal = async (type: DashboardModalType) => {
+    try {
+      setActiveModal(type);
+      setModalLoading(true);
+      setModalError(null);
+
+      if (type === "properties" || type === "publicProperties") {
+        const response = await api.get("/properties");
+        const properties = response.data as DashboardPropertyListItem[];
+        setPropertyList(
+          type === "publicProperties"
+            ? properties.filter((property) => property.isPublic)
+            : properties,
+        );
+        return;
+      }
+
+      if (type === "clients") {
+        const response = await api.get("/clients");
+        setClientList(response.data);
+        return;
+      }
+
+      const response = await api.get("/users");
+      setUserList(response.data);
+    } catch (modalFetchError: any) {
+      console.error("Error fetching modal data:", modalFetchError);
+      setModalError(
+        modalFetchError.response?.data?.message ||
+          "No se pudo cargar el listado solicitado",
+      );
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const openStatusPropertiesModal = async (status: string) => {
+    try {
+      setActiveModal("statusProperties");
+      setModalLoading(true);
+      setModalError(null);
+      setSelectedStatusLabel(PROPERTY_STATUS_LABELS[status] ?? status);
+
+      const response = await api.get("/properties");
+      const properties = response.data as DashboardPropertyListItem[];
+      setPropertyList(
+        properties.filter((property) => property.status === status),
+      );
+    } catch (modalFetchError: any) {
+      console.error("Error fetching properties by status:", modalFetchError);
+      setModalError(
+        modalFetchError.response?.data?.message ||
+          "No se pudo cargar el listado por estado",
+      );
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
   const StatCard = ({
     title,
     value,
@@ -116,8 +237,13 @@ export const DashboardPage = () => {
     color,
     trend,
     trendValue,
+    onClick,
   }: any) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+    >
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600">{title}</p>
@@ -141,8 +267,146 @@ export const DashboardPage = () => {
           <Icon className="w-6 h-6" />
         </div>
       </div>
-    </div>
+    </button>
   );
+
+  const renderModalContent = () => {
+    if (modalLoading) {
+      return (
+        <div className="py-10 text-center text-gray-500">
+          Cargando listado...
+        </div>
+      );
+    }
+
+    if (modalError) {
+      return <div className="py-6 text-sm text-red-600">{modalError}</div>;
+    }
+
+    if (
+      activeModal === "properties" ||
+      activeModal === "publicProperties" ||
+      activeModal === "statusProperties"
+    ) {
+      if (!propertyList.length) {
+        return (
+          <div className="py-10 text-center text-gray-500">
+            No hay propiedades para mostrar.
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-3">
+          {propertyList.map((property) => (
+            <Link
+              key={property.id}
+              to={`/admin/propiedades/ver/${property.id}`}
+              onClick={closeModal}
+              className="block rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900">{property.code}</p>
+                  <p className="text-sm text-gray-600 truncate">
+                    {property.address}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {property.propertyType} ·{" "}
+                    {PROPERTY_STATUS_LABELS[property.status] ?? property.status}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-semibold text-gray-900">
+                    {formatCurrency(property.price)}
+                  </p>
+                  {property.isPublic !== undefined && (
+                    <p className="text-xs text-gray-500">
+                      {property.isPublic ? "Publica" : "Privada"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      );
+    }
+
+    if (activeModal === "clients") {
+      if (!clientList.length) {
+        return (
+          <div className="py-10 text-center text-gray-500">
+            No hay clientes para mostrar.
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-3">
+          {clientList.map((client) => (
+            <Link
+              key={client.id}
+              to={`/admin/clientes/editar/${client.id}`}
+              onClick={closeModal}
+              className="block rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
+            >
+              <p className="font-semibold text-gray-900">
+                {client.firstName} {client.lastName}
+              </p>
+              <p className="text-sm text-gray-600">{client.phone}</p>
+              {client.email && (
+                <p className="text-xs text-gray-500 mt-1 truncate">
+                  {client.email}
+                </p>
+              )}
+            </Link>
+          ))}
+        </div>
+      );
+    }
+
+    if (!userList.length) {
+      return (
+        <div className="py-10 text-center text-gray-500">
+          No hay usuarios para mostrar.
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {userList.map((systemUser) => (
+          <Link
+            key={systemUser.id}
+            to={`/admin/usuarios/editar/${systemUser.id}`}
+            onClick={closeModal}
+            className="block rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900">
+                  {systemUser.firstName} {systemUser.lastName}
+                </p>
+                <p className="text-sm text-gray-600">@{systemUser.username}</p>
+                <p className="text-xs text-gray-500 mt-1 truncate">
+                  {systemUser.email}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-sm font-medium text-gray-700">
+                  {systemUser.type}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {systemUser.isActive ? "Activo" : "Inactivo"}
+                </p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    );
+  };
 
   const StatusChart = () => {
     if (!dashboardData?.propertiesByStatus?.length) return null;
@@ -166,22 +430,26 @@ export const DashboardPage = () => {
             ];
 
             return (
-              <div
+              <button
+                type="button"
                 key={item.status}
-                className="flex items-center justify-between"
+                onClick={() => openStatusPropertiesModal(item.status)}
+                className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-left hover:bg-gray-50"
               >
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-3 h-3 rounded-full ${colors[index % colors.length]}`}
                   ></div>
-                  <span className="text-sm text-gray-700">{item.status}</span>
+                  <span className="text-sm text-gray-700">
+                    {PROPERTY_STATUS_LABELS[item.status] ?? item.status}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">
                     {item._count.id}
                   </span>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -296,6 +564,35 @@ export const DashboardPage = () => {
 
   return (
     <div className="space-y-6">
+      {activeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {activeModal === "statusProperties" && selectedStatusLabel
+                    ? `${MODAL_TITLES[activeModal]}: ${selectedStatusLabel}`
+                    : MODAL_TITLES[activeModal]}
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Selecciona un elemento para abrir su vista correspondiente.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+              {renderModalContent()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -332,24 +629,28 @@ export const DashboardPage = () => {
           value={dashboardData.counters.properties}
           icon={Building2}
           color="bg-blue-500"
+          onClick={() => openDashboardModal("properties")}
         />
         <StatCard
           title="Clientes Activos"
           value={dashboardData.counters.clients}
           icon={UserCheck}
           color="bg-green-500"
+          onClick={() => openDashboardModal("clients")}
         />
         <StatCard
           title="Usuarios Sistema"
           value={dashboardData.counters.users}
           icon={Users}
           color="bg-purple-500"
+          onClick={() => openDashboardModal("users")}
         />
         <StatCard
           title="Propiedades Públicas"
           value={dashboardData.counters.publicProperties}
           icon={Building2}
           color="bg-orange-500"
+          onClick={() => openDashboardModal("publicProperties")}
         />
       </div>
 
@@ -375,8 +676,9 @@ export const DashboardPage = () => {
           <div className="p-6">
             <div className="space-y-4">
               {dashboardData.latestProperties.map((property) => (
-                <div
+                <Link
                   key={property.id}
+                  to={`/admin/propiedades/ver/${property.id}`}
                   className="flex items-center gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <img
@@ -399,12 +701,12 @@ export const DashboardPage = () => {
                     <p className="font-semibold text-gray-900">
                       {formatCurrency(property.price)}
                     </p>
-                    <p className="text-xs text-gray-500">{property.status}</p>
+                    <p className="text-xs text-gray-500">
+                      {PROPERTY_STATUS_LABELS[property.status] ??
+                        property.status}
+                    </p>
                   </div>
-                  <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                    <Eye className="w-4 h-4" />
-                  </button>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
