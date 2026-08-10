@@ -230,6 +230,9 @@ export const PropertyFormPage = () => {
   const [clientSearch, setClientSearch] = useState("");
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const clientDropdownRef = useRef<HTMLDivElement>(null);
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
+  const ownerDropdownRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState("basic");
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -303,6 +306,9 @@ export const PropertyFormPage = () => {
     control,
     name: "negotiationClientId",
   });
+  const watchedOwner = useWatch({ control, name: "owner" }) as
+    | string
+    | undefined;
   const watchedBasicServices =
     (useWatch({ control, name: "basicServices" }) as string[]) || [];
 
@@ -313,6 +319,13 @@ export const PropertyFormPage = () => {
       if (found) setClientSearch(`${found.firstName} ${found.lastName}`);
     }
   }, [watchedNegotiationClientId, clients]);
+
+  // Initialize ownerSearch label when editing
+  useEffect(() => {
+    if (watchedOwner !== undefined && watchedOwner !== null) {
+      setOwnerSearch(watchedOwner);
+    }
+  }, [watchedOwner]);
 
   // Close client dropdown on outside click
   useEffect(() => {
@@ -328,6 +341,21 @@ export const PropertyFormPage = () => {
       document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [clientDropdownOpen]);
+
+  // Close owner dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        ownerDropdownRef.current &&
+        !ownerDropdownRef.current.contains(e.target as Node)
+      ) {
+        setOwnerDropdownOpen(false);
+      }
+    };
+    if (ownerDropdownOpen)
+      document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [ownerDropdownOpen]);
 
   const extractCoordsFromGoogleMapsUrl = useCallback(
     async (url: string) => {
@@ -877,6 +905,16 @@ export const PropertyFormPage = () => {
     );
   }, [clients, clientSearch]);
 
+  const filteredOwnerClients = useMemo(() => {
+    const q = ownerSearch.toLowerCase();
+    if (!q) return clients;
+    return clients.filter(
+      (c) =>
+        `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
+        c.phone.includes(q),
+    );
+  }, [clients, ownerSearch]);
+
   // Memoize property type options
   const propertyTypeOptions = useMemo(
     () => (
@@ -1260,12 +1298,93 @@ export const PropertyFormPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Propietario
                 </label>
-                <input
-                  type="text"
-                  {...register("owner")}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Nombre del propietario"
-                />
+                <input type="hidden" {...register("owner")} />
+                <div className="relative" ref={ownerDropdownRef}>
+                  <div className="flex">
+                    <input
+                      type="text"
+                      value={ownerSearch}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setOwnerSearch(newValue);
+                        setValue("owner", newValue, {
+                          shouldValidate: false,
+                        });
+                        setOwnerDropdownOpen(true);
+                      }}
+                      onFocus={() => setOwnerDropdownOpen(true)}
+                      onBlur={(e) => {
+                        setValue("owner", e.target.value, {
+                          shouldValidate: false,
+                        });
+                      }}
+                      placeholder="Seleccionar de la lista o escribir manualmente..."
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      autoComplete="off"
+                    />
+                    {ownerSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOwnerSearch("");
+                          setValue("owner", "", { shouldValidate: false });
+                          setOwnerDropdownOpen(false);
+                        }}
+                        className="ml-1 px-2 text-gray-400 hover:text-gray-600 rounded-md border border-gray-300 hover:bg-gray-50"
+                        title="Limpiar"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                  {ownerDropdownOpen && filteredOwnerClients.length > 0 && (
+                    <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                      <li
+                        onMouseDown={() => {
+                          setOwnerSearch("");
+                          setValue("owner", "", { shouldValidate: true });
+                          setOwnerDropdownOpen(false);
+                        }}
+                        className="px-4 py-2 cursor-pointer hover:bg-gray-50 text-sm text-gray-500 italic border-b border-gray-100"
+                      >
+                        (Dejar vacío / sin propietario)
+                      </li>
+                      {filteredOwnerClients.map((client) => (
+                        <li
+                          key={client.id}
+                          onMouseDown={() => {
+                            const fullName = `${client.firstName} ${client.lastName}`;
+                            setOwnerSearch(fullName);
+                            setValue("owner", fullName, {
+                              shouldValidate: true,
+                            });
+                            setOwnerDropdownOpen(false);
+                          }}
+                          className="px-4 py-2 cursor-pointer hover:bg-blue-50 text-sm flex justify-between"
+                        >
+                          <span className="font-medium">
+                            {client.firstName} {client.lastName}
+                          </span>
+                          <span className="text-gray-400 text-xs">
+                            {client.phone}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {ownerDropdownOpen &&
+                    filteredOwnerClients.length === 0 &&
+                    ownerSearch.length > 0 && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg px-4 py-2 text-sm text-gray-500">
+                        No se encontraron clientes coincidentes. Puedes dejar
+                        escrito el nombre manualmente.
+                      </div>
+                    )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Selecciona un cliente existente o escribe un nombre
+                  personalizado. Campo opcional.
+                </p>
               </div>
 
               <div className="flex items-center gap-2 mt-6">
