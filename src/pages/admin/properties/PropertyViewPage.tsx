@@ -13,6 +13,12 @@ const INTEREST_LEVELS: { value: InterestLevel; label: string; color: string; sta
   { value: 'Alto',    label: 'Alto',     color: 'bg-orange-100 text-orange-700', stars: 3 },
   { value: 'MuyAlto', label: 'Muy Alto', color: 'bg-red-100 text-red-700',       stars: 4 },
 ];
+const INTEREST_LEVEL_RANK: Record<InterestLevel, number> = {
+  Bajo: 1,
+  Medio: 2,
+  Alto: 3,
+  MuyAlto: 4,
+};
 interface ClientSummary { id: string; firstName: string; lastName: string; email?: string; phone: string }
 interface PropertyInterest {
   id: string;
@@ -489,7 +495,7 @@ export const PropertyViewPage = () => {
         // Fetch interests
         try {
           const intRes = await api.get(`/property-interests?propertyId=${id}`);
-          setInterests(intRes.data);
+          setInterests(sortInterests(Array.isArray(intRes.data) ? intRes.data : []));
         } catch { /* non-critical */ }
       } catch (e) {
       } finally {
@@ -557,6 +563,10 @@ export const PropertyViewPage = () => {
       setShowRecommendationsModal(true);
     }
 
+    // Los interesados ya se guardan automáticamente desde el backend (cola).
+    // Refrescamos la lista para que el usuario vea el orden por nivel.
+    await refreshInterests();
+
     if (notification.id) {
       try {
         await api.patch(`/notifications/${notification.id}/read`);
@@ -613,11 +623,20 @@ export const PropertyViewPage = () => {
     setRecommendedCandidates((prev) => prev.filter((candidate) => candidate.client_id !== clientId));
   };
 
+  const sortInterests = (items: PropertyInterest[]): PropertyInterest[] =>
+    [...items].sort((a, b) => {
+      const rank = INTEREST_LEVEL_RANK[b.interestLevel] - INTEREST_LEVEL_RANK[a.interestLevel];
+      if (rank !== 0) return rank;
+      const aDate = new Date(a.interestDate).getTime();
+      const bDate = new Date(b.interestDate).getTime();
+      return bDate - aDate;
+    });
+
   const refreshInterests = async () => {
     if (!id) return;
     try {
       const intRes = await api.get(`/property-interests?propertyId=${id}`);
-      setInterests(intRes.data);
+      setInterests(sortInterests(Array.isArray(intRes.data) ? intRes.data : []));
     } catch {
       // non-critical
     }
@@ -627,22 +646,37 @@ export const PropertyViewPage = () => {
     if (!id) return;
     try {
       setRunningRecommendations(true);
-      const response = await api.post(`/properties/${id}/recommendations`);
+      const response = await api.post(`/properties/${id}/recommendations`, { enqueue: false, persist: true });
 
       if (response?.data?.recommendationQueued) {
         toastSuccess('La recomendación IA se está procesando en segundo plano.');
         return;
       }
 
+      await refreshInterests();
+
       const candidates = normalizeRecommendedCandidates(response?.data?.recommendedCandidates);
+      const summary = response?.data?.reconcile?.summary ?? null;
+      const created = Number(summary?.created ?? 0);
+      const updated = Number(summary?.updated ?? 0);
+      const deleted = Number(summary?.deleted ?? 0);
 
       if (candidates.length === 0) {
-        toastError('No se encontraron candidatos recomendados para este inmueble.');
+        toastSuccess('La recomendación IA finalizó. No se encontraron candidatos para actualizar.');
         return;
       }
 
-      setRecommendedCandidates(candidates);
-      setShowRecommendationsModal(true);
+      const hasChanges = created || updated || deleted;
+
+      if (hasChanges) {
+        toastSuccess(
+          `Recomendación IA aplicada: ${candidates.length} candidato(s). ${created} nuevo(s), ${updated} actualizado(s), ${deleted} removido(s). Revisa la lista “Clientes Interesados”.`,
+        );
+      } else {
+        toastSuccess(
+          `Recomendación IA finalizada: se analizaron ${candidates.length} candidato(s). La lista “Clientes Interesados” ya está al día.`,
+        );
+      }
     } catch (error) {
       toastError('No se pudo ejecutar la recomendación manual.');
     } finally {
@@ -657,26 +691,23 @@ export const PropertyViewPage = () => {
       setSavingRecommendations(true);
       const today = new Date().toISOString().split('T')[0];
 
-      const results = await Promise.allSettled(
-        recommendedCandidates.map((candidate) =>
-          api.post('/property-interests', {
-            propertyId: id,
-            clientId: candidate.client_id,
-            interestDate: today,
-            interestLevel: INTEREST_LEVEL_TO_PRISMA[candidate.interest_level],
-            notes: candidate.reason,
-          }),
-        ),
+      const response = await api.post(`/property-interests/properties/${id}/reconcile`, {
+        recommendations: recommendedCandidates.map((candidate) => ({
+          clientId: candidate.client_id,
+          interestLevel: INTEREST_LEVEL_TO_PRISMA[candidate.interest_level],
+          interestDate: today,
+          notes: candidate.reason || undefined,
+        })),
+      });
+
+      const summary = response?.data?.summary;
+      const created = Number(summary?.created ?? 0);
+      const updated = Number(summary?.updated ?? 0);
+      const deleted = Number(summary?.deleted ?? 0);
+
+      toastSuccess(
+        `Interesados sincronizados: ${created} nuevo(s), ${updated} actualizado(s), ${deleted} removido(s).`,
       );
-
-      const successCount = results.filter((result) => result.status === 'fulfilled').length;
-
-      if (successCount > 0) {
-        toastSuccess(`Se guardaron ${successCount} interesado(s) recomendados.`);
-      }
-      if (successCount !== recommendedCandidates.length) {
-        toastError('Algunos interesados no pudieron guardarse.');
-      }
 
       setShowRecommendationsModal(false);
       setRecommendedCandidates([]);
