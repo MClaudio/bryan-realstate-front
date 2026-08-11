@@ -1235,7 +1235,7 @@ export const PropertyFormPage = () => {
                       autoComplete="off"
                     />
                     {clientDropdownOpen && filteredClients.length > 0 && (
-                      <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                      <ul className="dropdown-panel absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
                         {filteredClients.map((client) => (
                           <li
                             key={client.id}
@@ -1263,7 +1263,7 @@ export const PropertyFormPage = () => {
                     {clientDropdownOpen &&
                       filteredClients.length === 0 &&
                       clientSearch.length > 0 && (
-                        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg px-4 py-2 text-sm text-gray-500">
+                        <div className="dropdown-panel absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg px-4 py-2 text-sm text-gray-500">
                           No se encontraron clientes
                         </div>
                       )}
@@ -1338,7 +1338,7 @@ export const PropertyFormPage = () => {
                     )}
                   </div>
                   {ownerDropdownOpen && filteredOwnerClients.length > 0 && (
-                    <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                    <ul className="dropdown-panel absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
                       <li
                         onMouseDown={() => {
                           setOwnerSearch("");
@@ -1375,7 +1375,7 @@ export const PropertyFormPage = () => {
                   {ownerDropdownOpen &&
                     filteredOwnerClients.length === 0 &&
                     ownerSearch.length > 0 && (
-                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg px-4 py-2 text-sm text-gray-500">
+                      <div className="dropdown-panel absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg px-4 py-2 text-sm text-gray-500">
                         No se encontraron clientes coincidentes. Puedes dejar
                         escrito el nombre manualmente.
                       </div>

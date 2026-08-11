@@ -6,7 +6,7 @@ export const PublicLayout = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-white shadow-md sticky top-0 z-50">
         <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
           <Link to="/" className="text-2xl font-bold text-blue-600">
