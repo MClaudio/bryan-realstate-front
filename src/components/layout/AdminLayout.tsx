@@ -1,5 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { 
   LayoutDashboard, 
   Users, 
@@ -16,6 +17,10 @@ import {
   ShieldX,
   UserCircle,
   ExternalLink,
+  Sun,
+  Moon,
+  Monitor,
+  Check,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
@@ -38,6 +43,7 @@ interface NotificationItem {
 
 export const AdminLayout = () => {
   const { logout, user, token } = useAuth();
+  const { theme, resolvedTheme, setTheme, themeClass } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -50,6 +56,8 @@ export const AdminLayout = () => {
   const [unreadNotifications, setUnreadNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingUnread, setLoadingUnread] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
 
   const fetchUnreadNotifications = async () => {
     try {
@@ -183,13 +191,16 @@ export const AdminLayout = () => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setUserMenuOpen(false);
       }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
+        setThemeMenuOpen(false);
+      }
     };
 
-    if (userMenuOpen) {
+    if (userMenuOpen || themeMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [userMenuOpen]);
+  }, [userMenuOpen, themeMenuOpen]);
 
   // Cerrar menú al cambiar de ruta - handled by click-outside listener
 
@@ -213,7 +224,7 @@ export const AdminLayout = () => {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className={`flex h-screen bg-gray-50 ${themeClass}`}>
       {/* Mobile Sidebar Overlay */}
       {isMobile && isSidebarOpen && (
         <div 
@@ -317,7 +328,7 @@ export const AdminLayout = () => {
 
             {/* User Dropdown Menu */}
             {userMenuOpen && (
-              <div className={`absolute bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 ${
+              <div className={`dropdown-panel absolute bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 ${
                 !isSidebarOpen && !isMobile
                   ? 'bottom-0 left-full ml-2 w-48'
                   : 'bottom-full left-0 right-0 mb-2'
@@ -364,11 +375,82 @@ export const AdminLayout = () => {
             </h1>
           </div>
           <div className="flex items-center gap-4">
+            <div className="relative" ref={themeMenuRef}>
+              <button
+                onClick={() => setThemeMenuOpen((prev) => !prev)}
+                className="relative p-2 rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-white/5 group"
+                title={
+                  theme === 'system'
+                    ? `Tema del sistema (${resolvedTheme === 'dark' ? 'oscuro' : 'claro'})`
+                    : theme === 'dark'
+                      ? 'Modo oscuro'
+                      : 'Modo claro'
+                }
+                aria-label="Cambiar tema"
+              >
+                {resolvedTheme === 'dark' ? (
+                  <Moon className="w-5 h-5 text-gray-600 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                ) : (
+                  <Sun className="w-5 h-5 text-gray-600 dark:text-gray-200 group-hover:text-amber-500 transition-colors" />
+                )}
+                {theme === 'system' && (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-600 text-white text-[8px] leading-3.5 flex items-center justify-center font-bold shadow">
+                    A
+                  </span>
+                )}
+              </button>
+              {themeMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 z-50 w-52 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-surface-elevated shadow-xl overflow-hidden">
+                  <div className="px-3 py-2 text-[11px] uppercase tracking-wider text-gray-500 dark:text-ink-subtle border-b border-gray-100 dark:border-white/5">
+                    Aspecto
+                  </div>
+                  {([
+                    { mode: 'light', label: 'Claro', Icon: Sun },
+                    { mode: 'dark', label: 'Oscuro', Icon: Moon },
+                    { mode: 'system', label: 'Sistema', Icon: Monitor },
+                  ] as const).map(({ mode, label, Icon }) => {
+                    const active = theme === mode;
+                    return (
+                      <button
+                        key={mode}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setTheme(mode);
+                          setThemeMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors ${
+                          active
+                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'
+                            : 'text-gray-700 hover:bg-gray-50 dark:text-ink dark:hover:bg-white/5'
+                        }`}
+                      >
+                        <span
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            active
+                              ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/25 dark:text-blue-300'
+                              : 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-ink-muted'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </span>
+                        <span className="flex-1 text-left font-medium">
+                          {label}
+                        </span>
+                        {active && (
+                          <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={openNotifications}
-              className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="relative p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors"
             >
-              <Bell className="w-5 h-5 text-gray-600" />
+              <Bell className="w-5 h-5 text-gray-600 dark:text-gray-200" />
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[10px] leading-5 font-bold text-center">
                   {unreadCount > 99 ? '99+' : unreadCount}
@@ -386,7 +468,7 @@ export const AdminLayout = () => {
 
       {/* Notifications Sidebar */}
       <aside
-        className={`fixed right-0 top-0 h-full w-full sm:w-[420px] bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300 ${
+        className={`dropdown-panel fixed right-0 top-0 h-full w-full sm:w-[420px] bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300 ${
           notificationsOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
