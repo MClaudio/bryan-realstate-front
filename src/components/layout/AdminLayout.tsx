@@ -23,7 +23,7 @@ import {
   Check,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
-import api from '../../services/api';
+import api, { getApiBaseUrl } from '../../services/api';
 import Swal from 'sweetalert2';
 import { io, type Socket } from 'socket.io-client';
 
@@ -100,8 +100,13 @@ export const AdminLayout = () => {
   useEffect(() => {
     if (!token) return;
 
-    const apiBase = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
-    const socketBaseUrl = String(apiBase).replace(/\/api\/?$/, '');
+    const apiBase = getApiBaseUrl();
+    // Remove trailing `/api` suffix if present so socket namespace lands on host root.
+    let socketBaseUrl = String(apiBase).replace(/\/api\/?$/, '');
+    if (socketBaseUrl === '' || !/^https?:\/\//i.test(socketBaseUrl)) {
+      // Relativa -> usamos el origen del navegador (misma URL que el frontend)
+      socketBaseUrl = window.location.origin;
+    }
 
     const socket: Socket = io(`${socketBaseUrl}/notifications`, {
       transports: ['websocket'],

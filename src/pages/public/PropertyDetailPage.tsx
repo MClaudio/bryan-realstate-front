@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import api from '../../services/api'
+import api, { resolvePublicFileUrl } from '../../services/api'
 import { MapPin, Building, ArrowLeft, ChevronLeft, ChevronRight, Instagram, Youtube, Facebook } from 'lucide-react'
 
 export const PropertyDetailPage = () => {
@@ -58,11 +58,9 @@ export const PropertyDetailPage = () => {
     fetchProperty()
   }, [id])
 
-  const apiBase = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api'
-  const base = String(apiBase).replace(/\/$/, '')
   const images: string[] = (property?.files || [])
     .filter((pf: any) => pf.fileType === 'image')
-    .map((pf: any) => `${base}/public/files/${pf.file.id}`)
+    .map((pf: any) => resolvePublicFileUrl(pf.file.id))
   const services: string[] = Array.isArray(property?.basicServices)
     ? property?.basicServices
     : (typeof property?.basicServices === 'string' ? (() => { try { return JSON.parse(property.basicServices) } catch { return [] } })() : [])

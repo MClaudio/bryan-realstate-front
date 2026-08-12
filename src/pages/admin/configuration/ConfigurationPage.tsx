@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import api from '../../../services/api';
+import api, { resolvePublicFileUrl } from '../../../services/api';
 import { Save, Building, Phone, Mail, Globe, Upload } from 'lucide-react';
 import { alertError, alertConfirm, toastSuccess, toastError } from '../../../utils/alerts';
 
@@ -35,9 +35,7 @@ export const ConfigurationPage = () => {
       if (response.data) {
         reset(response.data);
         if (response.data.logo) {
-          const apiBase = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
-          const base = String(apiBase).replace(/\/$/, '');
-          setLogoPreview(`${base}/public/files/${response.data.logo.id}`);
+          setLogoPreview(resolvePublicFileUrl(response.data.logo.id));
           setCurrentLogoId(response.data.logo.id);
         }
       }

@@ -15,6 +15,71 @@ export const formatFileSizeMb = (bytes: number): string => {
   return `${(bytes / (ONE_MB * 1024)).toFixed(2)} GB`;
 };
 
+/**
+ * Base URL del backend API.
+ *
+ * REGLA: Siempre que sea posible usamos rutas relativas (empiezan por `/api` o `/uploads`)
+ * para que NUNCA dependamos de un hostname/dominio externo que pueda fallar por
+ * resolución DNS (el típico error `net::ERR_NAME_NOT_RESOLVED` en producción tras un deploy).
+ *
+ * - Producción (Nginx): `/api` y `/uploads` se sirven por `location ^~ /api/` y `/uploads/`
+ *   del propio nginx.conf → reverse proxy al contenedor NestJS.
+ * - Desarrollo (vite dev server): `/api` y `/uploads` se sirven por el `server.proxy` de
+ *   vite.config.ts → reverse proxy a `http://localhost:3000`.
+ * - Solo si el usuario define explícitamente `VITE_API_URL` con un dominio distinto
+ *   (ej: un backend público separado del frontend) se usa ese valor.
+ */
+const DEFAULT_API_BASE = '/api';
+const ENV_API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+const API_BASE = ENV_API_BASE && ENV_API_BASE.length > 0 ? ENV_API_BASE : DEFAULT_API_BASE;
+
+// Garantizamos que no termine en `/` para no generar rutas con `//`.
+const normalizedBase = API_BASE.replace(/\/+$/, '');
+
+export const getApiBaseUrl = (): string => normalizedBase;
+
+/** Resuelve una URL que empiece por `/uploads/...` contra la base correcta. */
+export const resolveAssetUrl = (relativePath: string): string => {
+  if (!relativePath || typeof relativePath !== 'string') return relativePath ?? '';
+  if (/^https?:\/\//i.test(relativePath)) return relativePath;
+  // Si la ruta empieza por `/uploads/...` y la API base es un dominio completo,
+  // resolvemos contra ese mismo dominio (backend hostea uploads desde la misma raíz).
+  if (relativePath.startsWith('/uploads/') && /^https?:\/\//i.test(normalizedBase)) {
+    try {
+      const u = new URL(normalizedBase);
+      return `${u.protocol}//${u.host}${relativePath}`;
+    } catch {
+      /* noop */
+    }
+  }
+  return relativePath;
+};
+
+/**
+ * Resuelve la URL para un endpoint público de archivos del backend, en la forma
+ * `/public/files/{fileId}`.
+ *
+ * - Si la API base es relativa (por defecto `/api`): devolvemos la ruta relativa
+ *   `/public/files/{id}` que resuelve el Nginx de producción o el proxy de Vite
+ *   en desarrollo.
+ * - Si la API base es un dominio completo (VITE_API_URL=https://backend.example.com/api):
+ *   construye `https://backend.example.com/public/files/{id}`.
+ */
+export const resolvePublicFileUrl = (fileId: string | null | undefined): string => {
+  if (!fileId) return '';
+  const rawId = String(fileId).trim();
+  if (!rawId) return '';
+  if (/^https?:\/\//i.test(normalizedBase)) {
+    try {
+      const u = new URL(normalizedBase);
+      return `${u.protocol}//${u.host}/public/files/${encodeURIComponent(rawId)}`;
+    } catch {
+      /* noop */
+    }
+  }
+  return `/public/files/${encodeURIComponent(rawId)}`;
+};
+
 export const humanizeAxiosError = (error: unknown): { title: string; message: string } => {
   const anyErr = error as
     | {
@@ -71,7 +136,7 @@ export const humanizeAxiosError = (error: unknown): { title: string; message: st
 };
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  baseURL: normalizedBase,
   timeout: DEFAULT_TIMEOUT_MS,
 });
 
