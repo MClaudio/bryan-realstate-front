@@ -11,7 +11,7 @@ import {
   PieChart,
   X,
 } from "lucide-react";
-import api from "../../services/api";
+import api, { resolveFileUrl } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { PROPERTY_STATUS_LABELS } from "../../utils/propertyEnums";
@@ -152,9 +152,8 @@ export const DashboardPage = () => {
     const firstImage = property.files?.find(
       (pf: any) => pf.fileType === "image",
     )?.file;
-    return firstImage
-      ? firstImage.path
-      : "https://images.unsplash.com/photo-1600596542815-27b5c0b8aa2b?auto=format&fit=crop&w=200&q=80";
+    return resolveFileUrl(firstImage)
+      || "https://images.unsplash.com/photo-1600596542815-27b5c0b8aa2b?auto=format&fit=crop&w=200&q=80";
   };
 
   const formatCurrency = (amount: string | number) => {

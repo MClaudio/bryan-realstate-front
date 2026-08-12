@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import api from '../../services/api'
+import api, { resolveFileUrl } from '../../services/api'
 import { MapPin, Building, ArrowLeft, ChevronLeft, ChevronRight, Instagram, Youtube, Facebook } from 'lucide-react'
 
 export const PropertyDetailPage = () => {
@@ -60,7 +60,7 @@ export const PropertyDetailPage = () => {
 
   const images: string[] = (property?.files || [])
     .filter((pf: any) => pf.fileType === 'image')
-    .map((pf: any) => pf.file?.path)
+    .map((pf: any) => resolveFileUrl(pf.file))
   const services: string[] = Array.isArray(property?.basicServices)
     ? property?.basicServices
     : (typeof property?.basicServices === 'string' ? (() => { try { return JSON.parse(property.basicServices) } catch { return [] } })() : [])

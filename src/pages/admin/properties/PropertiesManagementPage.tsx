@@ -13,7 +13,7 @@ import {
   Building,
   ClipboardList,
 } from "lucide-react";
-import api from "../../../services/api";
+import api, { resolveFileUrl } from "../../../services/api";
 import { Link } from "react-router-dom";
 import { alertConfirm, alertError, toastSuccess } from "../../../utils/alerts";
 import {
@@ -122,8 +122,8 @@ export const PropertiesManagementPage = () => {
         return dateA - dateB;
       })[0]?.file;
 
-    return firstImage
-      ? firstImage.path
+    return firstImage && resolveFileUrl(firstImage)
+      ? resolveFileUrl(firstImage)
       : "https://images.unsplash.com/photo-1600596542815-27b5c0b8aa2b?auto=format&fit=crop&w=200&q=80";
   };
 

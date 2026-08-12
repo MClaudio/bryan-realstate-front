@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import api from '../../../services/api';
+import api, { resolveFileUrl } from '../../../services/api';
 import { Save, Building, Phone, Mail, Globe, Upload } from 'lucide-react';
 import { alertError, alertConfirm, toastSuccess, toastError } from '../../../utils/alerts';
 
@@ -35,7 +35,7 @@ export const ConfigurationPage = () => {
       if (response.data) {
         reset(response.data);
         if (response.data.logo) {
-          setLogoPreview(response.data.logo.path);
+          setLogoPreview(resolveFileUrl(response.data.logo));
           setCurrentLogoId(response.data.logo.id);
         }
       }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../../services/api';
+import api, { resolveFileUrl } from '../../../services/api';
 import { Trash2, FileText, Download, Search, X } from 'lucide-react';
 import { alertConfirm, alertError, toastSuccess } from '../../../utils/alerts';
 
@@ -156,7 +156,7 @@ export const FilesManagementPage = () => {
               <div className="aspect-square bg-gray-100 relative flex items-center justify-center">
                 {isImage(file.originalName) ? (
                   <img 
-                    src={file.path} 
+                    src={resolveFileUrl(file)} 
                     alt={file.originalName} 
                     className="w-full h-full object-cover"
                   />
@@ -166,7 +166,7 @@ export const FilesManagementPage = () => {
                 
                 <div className="absolute inset-0 bg-black/50 opacity-0 md:group-hover:opacity-100 transition hidden md:flex items-center justify-center gap-5 pointer-events-none">
                   <a
-                    href={file.path}
+                    href={resolveFileUrl(file)}
                     target="_blank"
                     rel="noreferrer"
                     title="Ver/Descargar"
@@ -206,7 +206,7 @@ export const FilesManagementPage = () => {
                 )}
                 <div className="mt-3 grid grid-cols-2 gap-2 md:hidden">
                   <a
-                    href={file.path}
+                    href={resolveFileUrl(file)}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg active:scale-[0.98] transition"
