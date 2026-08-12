@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../services/api';
+import api, { resolveFileUrl } from '../../services/api';
 import { Search, MapPin, Building, Filter } from 'lucide-react';
 import { PROPERTY_STATUS_LABELS, PROPERTY_STATUS_COLORS } from '../../utils/propertyEnums';
 
@@ -117,8 +117,8 @@ export const PropertiesPage = () => {
                 <div className="relative h-64 bg-gray-100 overflow-hidden">
                   <img 
                     src={(() => {
-                      const firstImagePath = property.files?.find((pf: any) => (pf as any).fileType === 'image')?.file?.path || property.files?.[0]?.file?.path;
-                      return firstImagePath ? firstImagePath : "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80";
+                      const firstFile = property.files?.find((pf: any) => (pf as any).fileType === 'image')?.file || property.files?.[0]?.file;
+                      return resolveFileUrl(firstFile) || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80";
                     })()} 
                     alt={property.code} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

@@ -56,14 +56,16 @@ export const resolveAssetUrl = (relativePath: string): string => {
 };
 
 /**
- * Resuelve la URL para un endpoint público de archivos del backend, en la forma
- * `/public/files/{fileId}`.
+ * Resuelve la URL para un endpoint público de archivos del backend.
  *
- * - Si la API base es relativa (por defecto `/api`): devolvemos la ruta relativa
- *   `/public/files/{id}` que resuelve el Nginx de producción o el proxy de Vite
- *   en desarrollo.
+ * IMPORTANTE: el backend tiene `setGlobalPrefix('api')`, así que
+ * `PublicFilesController` se sirve en `/api/public/files/{id}`, NO en
+ * `/public/files/{id}`.
+ *
+ * - Si la API base es relativa (por defecto `/api`): devolvemos
+ *   `/api/public/files/{id}`.
  * - Si la API base es un dominio completo (VITE_API_URL=https://backend.example.com/api):
- *   construye `https://backend.example.com/public/files/{id}`.
+ *   construye `https://backend.example.com/api/public/files/{id}`.
  */
 export const resolvePublicFileUrl = (fileId: string | null | undefined): string => {
   if (!fileId) return '';
@@ -72,12 +74,46 @@ export const resolvePublicFileUrl = (fileId: string | null | undefined): string 
   if (/^https?:\/\//i.test(normalizedBase)) {
     try {
       const u = new URL(normalizedBase);
-      return `${u.protocol}//${u.host}/public/files/${encodeURIComponent(rawId)}`;
+      // Asegurar que el path termine con /api/public/files/:id
+      const basePath = u.pathname.replace(/\/$/, '') || '/api';
+      return `${u.protocol}//${u.host}${basePath}/public/files/${encodeURIComponent(rawId)}`;
     } catch {
       /* noop */
     }
   }
-  return `/public/files/${encodeURIComponent(rawId)}`;
+  return `/api/public/files/${encodeURIComponent(rawId)}`;
+};
+
+/**
+ * Resuelve inteligentemente la URL de un archivo a partir de su objeto `file`
+ * (estructura típica del backend: `{ id, path, originalName, ... }`).
+ *
+ * El backend NO garantiza que `file.path` sea siempre una URL S3 absoluta:
+ * - A veces devuelve la URL presignada de Amazon completa (https://...s3.amazonaws.com/...).
+ * - A veces devuelve el path relativo crudo de la DB (`uploads/uuid.ext` o `/uploads/uuid.ext`).
+ * - En local dev puede ser también `/uploads/uuid.ext` servido estáticamente.
+ *
+ * Esta función:
+ * 1. Si `file.path` YA es una URL absoluta (http/https) → la usa directamente (mejor perf, sin redirect).
+ * 2. Si `file.path` es relativo o desconocido, pero tenemos `file.id` → usa `/public/files/{id}` que
+ *    hace un 302 redirect en el backend a la URL S3 presignada.
+ * 3. Fallback: devuelve `resolveAssetUrl(file.path)` por si acaso el path es `/uploads/...` local.
+ */
+export const resolveFileUrl = (
+  file: { id?: string | number | null; path?: string | null } | null | undefined,
+): string => {
+  if (!file) return '';
+  const p = typeof file.path === 'string' ? file.path.trim() : '';
+  // Caso 1: URL absoluta (S3 presignada). La usamos directamente, sin roundtrip extra.
+  if (/^https?:\/\//i.test(p)) return p;
+  // Caso 2: tenemos id, mejor pasar por el controller /public/files/:id que hace redirect a S3
+  // (o sirve el archivo local si no hay S3).
+  if (file.id !== null && file.id !== undefined && String(file.id).trim() !== '') {
+    return resolvePublicFileUrl(String(file.id));
+  }
+  // Caso 3: sin id pero con path relativo (ej: `/uploads/...` local).
+  if (p) return resolveAssetUrl(p);
+  return '';
 };
 
 export const humanizeAxiosError = (error: unknown): { title: string; message: string } => {
