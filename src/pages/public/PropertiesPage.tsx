@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../services/api';
+import api, { resolvePublicFileUrl } from '../../services/api';
 import { Search, MapPin, Building, Filter } from 'lucide-react';
 import { PROPERTY_STATUS_LABELS, PROPERTY_STATUS_COLORS } from '../../utils/propertyEnums';
 
@@ -117,10 +117,8 @@ export const PropertiesPage = () => {
                 <div className="relative h-64 bg-gray-100 overflow-hidden">
                   <img 
                     src={(() => {
-                      const apiBase = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
-                      const base = String(apiBase).replace(/\/$/, '');
                       const firstImageId = property.files?.find((pf: any) => (pf as any).fileType === 'image')?.file?.id || property.files?.[0]?.file?.id;
-                      return firstImageId ? `${base}/public/files/${firstImageId}` : "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80";
+                      return firstImageId ? resolvePublicFileUrl(firstImageId) : "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80";
                     })()} 
                     alt={property.code} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

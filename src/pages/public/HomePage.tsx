@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, ArrowRight, Building, MapPin, Phone, Mail, Instagram, Facebook, Youtube, MessageCircle, Star, Shield, Users, TrendingUp } from 'lucide-react';
-import api from '../../services/api';
+import api, { resolvePublicFileUrl } from '../../services/api';
 
 interface Configuration {
   companyName: string;
@@ -113,10 +113,8 @@ export const HomePage = () => {
   ];
 
   const getPropertyImage = (property: FeaturedProperty) => {
-    const apiBase = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
-    const base = String(apiBase).replace(/\/$/, '');
     const firstImage = property.files?.find(pf => pf.fileType === 'image')?.file;
-    return firstImage ? `${base}/public/files/${firstImage.id}` : "https://images.unsplash.com/photo-1600596542815-27b5c0b8aa2b?auto=format&fit=crop&w=800&q=80";
+    return firstImage ? resolvePublicFileUrl(firstImage.id) : "https://images.unsplash.com/photo-1600596542815-27b5c0b8aa2b?auto=format&fit=crop&w=800&q=80";
   };
 
   return (
