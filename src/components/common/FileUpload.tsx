@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect, memo } from 'react';
-import { Upload, X, File as FileIcon, Download } from 'lucide-react';
-import api from '../../services/api';
+import { Upload, X, File as FileIcon } from 'lucide-react';
+import api, {
+  MAX_UPLOAD_MB,
+  MAX_UPLOAD_BYTES,
+  formatFileSizeMb,
+  humanizeAxiosError,
+} from '../../services/api';
 import { alertError, alertConfirm } from '../../utils/alerts';
 
 interface FileData {
@@ -33,6 +38,7 @@ const FileUploadComponent = ({
 }: FileUploadProps) => {
   const [uploadedFiles, setUploadedFiles] = useState<FileData[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -55,13 +61,46 @@ const FileUploadComponent = ({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
 
-    const filesToUpload = Array.from(e.target.files);
+    const allSelected = Array.from(e.target.files);
+    const toUpload: File[] = [];
+    let rejectedMessage: string | null = null;
+
+    for (const file of allSelected) {
+      if (file.size > MAX_UPLOAD_BYTES) {
+        const sizeStr = formatFileSizeMb(file.size);
+        rejectedMessage =
+          rejectedMessage === null
+            ? `"${file.name}" pesa ${sizeStr}. El límite máximo es ${MAX_UPLOAD_MB} MB por archivo.`
+            : `${rejectedMessage}\n"${file.name}" pesa ${sizeStr}.`;
+        continue;
+      }
+      toUpload.push(file);
+    }
+
+    if (rejectedMessage) {
+      alertError(
+        toUpload.length === 0
+          ? 'Todos los archivos exceden el tamaño permitido'
+          : `Algunos archivos superan ${MAX_UPLOAD_MB} MB y no se subirán`,
+        rejectedMessage,
+      );
+    }
+
+    if (toUpload.length === 0) {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     setUploading(true);
 
     try {
-      const newUploadedFiles = [];
+      const newUploadedFiles: FileData[] = [];
 
-      for (const file of filesToUpload) {
+      for (const file of toUpload) {
+        setUploadProgress({ current: 0, total: file.size });
         const formData = new FormData();
         formData.append('file', file);
         formData.append('description', `Uploaded from property form`);
@@ -70,7 +109,14 @@ const FileUploadComponent = ({
           headers: {
             'Content-Type': 'multipart/form-data',
           },
+          onUploadProgress: (progressEvent) => {
+            const total = progressEvent.total ?? file.size;
+            const loaded = progressEvent.loaded ?? 0;
+            setUploadProgress({ current: loaded, total });
+          },
         });
+
+        setUploadProgress({ current: file.size, total: file.size });
 
         const fileId = response.data.id;
         const urlResp = await api.get(`/files/${fileId}/url`);
@@ -82,7 +128,7 @@ const FileUploadComponent = ({
         });
       }
 
-      const updatedFiles = multiple 
+      const updatedFiles = multiple
         ? [...uploadedFiles, ...newUploadedFiles]
         : newUploadedFiles;
 
@@ -90,10 +136,11 @@ const FileUploadComponent = ({
       onFilesChange(updatedFiles);
     } catch (error) {
       console.error('Error uploading files:', error);
-      const msg = (error as {response?: {data?: {message?: string}}})?.response?.data?.message || 'Error al subir archivos. Intente nuevamente.';
-      alertError('Error al subir archivos', msg);
+      const pretty = humanizeAxiosError(error);
+      alertError(pretty.title, pretty.message);
     } finally {
       setUploading(false);
+      setUploadProgress(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -103,7 +150,7 @@ const FileUploadComponent = ({
   const removeFile = async (id: string) => {
     const confirm = await alertConfirm('Eliminar archivo', '¿Estás seguro de eliminar este archivo?');
     if (!confirm.isConfirmed) return;
-    const updatedFiles = uploadedFiles.filter(f => f.id !== id);
+    const updatedFiles = uploadedFiles.filter((f) => f.id !== id);
     setUploadedFiles(updatedFiles);
     onFilesChange(updatedFiles);
   };
@@ -112,21 +159,9 @@ const FileUploadComponent = ({
     return name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
   };
 
-  const formatFileSize = (bytes?: number) => {
+  const formatSize = (bytes?: number) => {
     if (!bytes) return 'Desconocido';
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-  };
-
-  const handleDownload = (file: FileData) => {
-    const link = document.createElement('a');
-    link.href = file.url;
-    link.download = file.name;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    return formatFileSizeMb(bytes);
   };
 
   const moveFile = (fromId: string, toId: string) => {
@@ -149,16 +184,33 @@ const FileUploadComponent = ({
 
   const canReorder = allowReorder && displayMode === 'grid' && uploadedFiles.length > 1;
 
+  const progressPct =
+    uploadProgress && uploadProgress.total > 0
+      ? Math.max(0, Math.min(100, Math.round((uploadProgress.current / uploadProgress.total) * 100)))
+      : 0;
+
   return (
     <div className="space-y-4">
-      <div 
-        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition cursor-pointer"
-        onClick={() => fileInputRef.current?.click()}
+      <div
+        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+        onClick={() => !uploading && fileInputRef.current?.click()}
+        aria-disabled={uploading}
       >
         {uploading ? (
-          <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
-            <p className="text-sm text-gray-500">Subiendo archivos...</p>
+          <div className="flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="text-sm font-medium text-gray-700">Subiendo archivos...</p>
+            <div className="w-full max-w-sm h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-600 transition-all duration-200 ease-out"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            {uploadProgress && uploadProgress.total > 0 && (
+              <p className="text-xs text-gray-500">
+                {formatSize(uploadProgress.current)} / {formatSize(uploadProgress.total)} ({progressPct}%)
+              </p>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center">
@@ -166,14 +218,15 @@ const FileUploadComponent = ({
             <p className="text-sm font-medium text-gray-700">{title || 'Haz clic para subir archivos'}</p>
             <p className="text-xs text-gray-500 mt-1">
               {accept.includes('image') ? 'Soporta: JPG, PNG, WEBP' : 'Soporta: PDF, DOCX, XLSX, imágenes'}
+              {` · Máx. ${MAX_UPLOAD_MB} MB por archivo`}
             </p>
           </div>
         )}
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          multiple={multiple} 
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          multiple={multiple}
           accept={accept}
           onChange={handleFileSelect}
         />
@@ -182,7 +235,7 @@ const FileUploadComponent = ({
       {showPreview && uploadedFiles.length > 0 && (
         displayMode === 'grid' ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {uploadedFiles.map((file) => (
+            {uploadedFiles.map((file, index) => (
               <div
                 key={file.id}
                 className={`relative group bg-gray-100 rounded-lg overflow-hidden aspect-square ${canReorder ? 'cursor-grab active:cursor-grabbing' : ''}`}
@@ -214,19 +267,41 @@ const FileUploadComponent = ({
                   </div>
                 )}
 
-                {canReorder && (
-                  <div className="absolute top-2 left-2 bg-white/90 text-gray-800 text-xs font-semibold rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
-                    {uploadedFiles.findIndex((f) => f.id === file.id) + 1}
-                  </div>
-                )}
-                
-                <button
-                  type="button"
-                  onClick={() => removeFile(file.id)}
-                  className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:text-red-600"
+                <div
+                  className="absolute top-2 left-2 text-xs font-semibold rounded-full w-7 h-7 flex items-center justify-center shadow-md select-none"
+                  style={{ backgroundColor: '#ffffff', color: '#000000' }}
                 >
-                  <X size={16} />
-                </button>
+                  {index + 1}
+                </div>
+
+                <div className="absolute top-2 right-2 md:hidden">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(file.id);
+                    }}
+                    className="bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 active:scale-95 transition flex items-center justify-center h-8 w-8"
+                    aria-label="Quitar imagen"
+                    title="Quitar imagen"
+                  >
+                    <X size={16} strokeWidth={2.5} />
+                  </button>
+                </div>
+
+                <div className="absolute top-2 right-2 hidden md:flex md:opacity-0 md:group-hover:opacity-100 transition-opacity items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(file.id);
+                    }}
+                    className="bg-white/95 rounded-full p-1.5 shadow-md text-gray-700 hover:text-red-600 hover:bg-white transition flex items-center justify-center h-8 w-8"
+                    aria-label="Quitar imagen"
+                  >
+                    <X size={16} strokeWidth={2.25} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -240,25 +315,16 @@ const FileUploadComponent = ({
                     <p className="text-sm font-medium text-gray-700 truncate" title={file.name}>
                       {file.name}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(file.size)}
-                    </p>
+                    <p className="text-xs text-gray-500">{formatSize(file.size)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleDownload(file)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                    title="Descargar"
-                  >
-                    <Download size={16} />
-                  </button>
+                <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => removeFile(file.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                    title="Eliminar"
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition active:scale-95"
+                    title="Quitar archivo"
+                    aria-label="Quitar archivo"
                   >
                     <X size={16} />
                   </button>
@@ -281,7 +347,7 @@ const arePropsEqual = (prevProps: FileUploadProps, nextProps: FileUploadProps) =
   // Compare initialFiles by IDs only
   const prevIds = prevProps.initialFiles?.map((f) => f.id).join(',') || '';
   const nextIds = nextProps.initialFiles?.map((f) => f.id).join(',') || '';
-  
+
   return (
     prevProps.onFilesChange === nextProps.onFilesChange &&
     prevIds === nextIds &&
