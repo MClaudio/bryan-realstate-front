@@ -174,6 +174,16 @@ export const humanizeAxiosError = (error: unknown): { title: string; message: st
 const api = axios.create({
   baseURL: normalizedBase,
   timeout: DEFAULT_TIMEOUT_MS,
+  // Allow unlimited body sizes for large file uploads. Browser enforces
+  // network-level limits, but axios historically had restrictive defaults.
+  maxContentLength: Infinity,
+  maxBodyLength: Infinity,
+  // Signal upload progress reliably even when the connection is slow.
+  transitional: {
+    silentJSONParsing: true,
+    forcedJSONParsing: true,
+    clarifyTimeoutError: true,
+  },
 });
 
 const AUTH_ROUTES = ['/auth/login', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];
