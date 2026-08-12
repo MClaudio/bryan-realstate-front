@@ -16,16 +16,37 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
+        proxyTimeout: 20 * 60 * 1000,
+        timeout: 20 * 60 * 1000,
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            const cl = req.headers['content-length']
+            console.log(`[proxy] → ${req.method} ${req.url}  cl=${cl ?? '?'} target=${options.target}`)
+          })
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log(`[proxy] ← ${req.method} ${req.url}  status=${proxyRes.statusCode}`)
+          })
+          proxy.on('error', (err, req, res) => {
+            console.error(`[proxy] ✗ ERROR ${req.method} ${req.url}: ${err.name} ${err.message}`)
+          })
+          proxy.on('close', (proxyReq, req, res) => {
+            console.log(`[proxy] ⏹ CLOSE ${req.method} ${req.url}`)
+          })
+        },
       },
       '/uploads': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
+        proxyTimeout: 20 * 60 * 1000,
+        timeout: 20 * 60 * 1000,
       },
       '/public/files': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
+        proxyTimeout: 20 * 60 * 1000,
+        timeout: 20 * 60 * 1000,
       },
     },
   },
@@ -37,16 +58,22 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
+        proxyTimeout: 20 * 60 * 1000,
+        timeout: 20 * 60 * 1000,
       },
       '/uploads': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
+        proxyTimeout: 20 * 60 * 1000,
+        timeout: 20 * 60 * 1000,
       },
       '/public/files': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
+        proxyTimeout: 20 * 60 * 1000,
+        timeout: 20 * 60 * 1000,
       },
     },
   },
