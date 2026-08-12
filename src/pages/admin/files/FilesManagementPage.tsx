@@ -164,23 +164,29 @@ export const FilesManagementPage = () => {
                   <FileText size={48} className="text-gray-400" />
                 )}
                 
-                {/* Overlay Actions */}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-4">
-                  <a 
-                    href={file.path} 
-                    target="_blank" 
+                <div className="absolute inset-0 bg-black/50 opacity-0 md:group-hover:opacity-100 transition hidden md:flex items-center justify-center gap-5 pointer-events-none">
+                  <a
+                    href={file.path}
+                    target="_blank"
                     rel="noreferrer"
-                    className="p-2 bg-white rounded-full text-gray-700 hover:text-blue-600"
                     title="Ver/Descargar"
+                    aria-label="Ver o descargar archivo"
+                    pointer-events="auto"
+                    className="flex flex-none items-center justify-center !h-12 !w-12 p-0 m-0 border-0 !rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-md transition-colors"
+                    style={{ aspectRatio: '1 / 1' }}
                   >
-                    <Download size={20} />
+                    <Download size={22} strokeWidth={2.25} className="block" />
                   </a>
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => handleDelete(file.id)}
-                    className="p-2 bg-white rounded-full text-gray-700 hover:text-red-600"
                     title="Eliminar"
+                    aria-label="Eliminar archivo"
+                    pointer-events="auto"
+                    className="flex flex-none items-center justify-center !h-12 !w-12 p-0 m-0 border-0 !rounded-full bg-white text-gray-700 hover:text-red-600 shadow-md transition-colors"
+                    style={{ aspectRatio: '1 / 1' }}
                   >
-                    <Trash2 size={20} />
+                    <Trash2 size={22} strokeWidth={2.25} className="block" />
                   </button>
                 </div>
               </div>
@@ -198,6 +204,25 @@ export const FilesManagementPage = () => {
                     {file.description}
                   </p>
                 )}
+                <div className="mt-3 grid grid-cols-2 gap-2 md:hidden">
+                  <a
+                    href={file.path}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg active:scale-[0.98] transition"
+                  >
+                    <Download size={16} />
+                    Descargar
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(file.id)}
+                    className="inline-flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 rounded-lg active:scale-[0.98] transition"
+                  >
+                    <Trash2 size={16} />
+                    Eliminar
+                  </button>
+                </div>
               </div>
             </div>
           ))}
