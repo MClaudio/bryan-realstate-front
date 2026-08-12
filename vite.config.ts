@@ -19,18 +19,18 @@ export default defineConfig({
         proxyTimeout: 20 * 60 * 1000,
         timeout: 20 * 60 * 1000,
         configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+          proxy.on('proxyReq', (_proxyReq, req, _res) => {
             const cl = req.headers['content-length']
             console.log(`[proxy] → ${req.method} ${req.url}  cl=${cl ?? '?'} target=${options.target}`)
           })
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
             console.log(`[proxy] ← ${req.method} ${req.url}  status=${proxyRes.statusCode}`)
           })
-          proxy.on('error', (err, req, res) => {
+          proxy.on('error', (err, req, _res) => {
             console.error(`[proxy] ✗ ERROR ${req.method} ${req.url}: ${err.name} ${err.message}`)
           })
-          proxy.on('close', (proxyReq, req, res) => {
-            console.log(`[proxy] ⏹ CLOSE ${req.method} ${req.url}`)
+          proxy.on('close', (_proxyReq, _proxySocket, _serverSocket) => {
+            console.log(`[proxy] ⏹ CLOSE upstream socket`)
           })
         },
       },
