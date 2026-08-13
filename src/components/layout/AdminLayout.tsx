@@ -157,10 +157,10 @@ export const AdminLayout = () => {
         const res = await api.get('/configuration');
         const config: AppConfig = res.data;
         setAppConfig(config);
-        if (config?.logo?.id) {
-          const urlRes = await api.get(`/files/${config.logo.id}/url`);
-          setLogoUrl(urlRes.data.url ?? null);
-        }
+        // ConfigurationService.enrichLogo() returns logo.path = S3 signed URL or placeholder.
+        // No need for extra /files/:id/url call.
+        const logoPath = (config?.logo as any)?.path as string | undefined;
+        if (logoPath) setLogoUrl(logoPath);
       } catch {
         // Non-critical — keep defaults
       }

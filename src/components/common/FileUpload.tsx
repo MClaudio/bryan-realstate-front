@@ -119,10 +119,11 @@ const FileUploadComponent = ({
         setUploadProgress({ current: file.size, total: file.size });
 
         const fileId = response.data.id;
-        const urlResp = await api.get(`/files/${fileId}/url`);
+        // POST /files/upload now RETURNS enriched data (with signed S3 URL
+        // or inline SVG placeholder in path). No 2nd /files/:id/url call needed.
         newUploadedFiles.push({
           id: fileId,
-          url: urlResp.data.url,
+          url: (response.data.path as string) || '',
           name: response.data.originalName,
           size: response.data.size,
         });

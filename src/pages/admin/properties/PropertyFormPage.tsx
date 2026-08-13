@@ -607,6 +607,9 @@ export const PropertyFormPage = () => {
         ) => {
           return await Promise.all(
             files.map(
+              // Backend PropertiesService enrichPropertyFiles already fills
+              // f.file.path with the presigned S3 URL (or our placeholder SVG)
+              // so no second /files/:id/url roundtrip is needed.
               async (f: {
                 fileType: string;
                 file: {
@@ -616,20 +619,14 @@ export const PropertyFormPage = () => {
                   size?: number;
                 };
               }) => {
-                try {
-                  if (!f?.file?.id) return f;
-                  const urlResp = await api.get(`/files/${f.file.id}/url`);
-                  return {
-                    ...f,
-                    file: {
-                      ...f.file,
-                      path: urlResp.data.url,
-                      size: urlResp.data.size || f.file.size,
-                    },
-                  };
-                } catch {
-                  return f;
-                }
+                if (!f?.file?.id) return f;
+                return {
+                  ...f,
+                  file: {
+                    ...f.file,
+                    path: (f.file.path as string) || '',
+                  },
+                };
               },
             ),
           );
