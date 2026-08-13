@@ -288,20 +288,12 @@ const ProcessDetailModal = ({ process, onClose }: { process: Process; onClose: (
   const [fileUrls, setFileUrls] = useState<{ id: string; name: string; url: string }[]>([]);
 
   useEffect(() => {
-    const load = async () => {
-      const results = await Promise.all(
-        (process.files || []).map(async (pf) => {
-          try {
-            const r = await api.get(`/files/${pf.file.id}/url`);
-            return { id: pf.file.id, name: pf.file.originalName, url: r.data.url };
-          } catch {
-            return { id: pf.file.id, name: pf.file.originalName, url: '' };
-          }
-        })
-      );
-      setFileUrls(results);
-    };
-    load();
+    const results = (process.files || []).map((pf: any) => ({
+      id: pf.file.id,
+      name: pf.file.originalName,
+      url: (pf.file.path as string) || '',
+    }));
+    setFileUrls(results);
   }, [process]);
 
   const expenses: Expense[] = Array.isArray(process.expenses) ? process.expenses : [];
@@ -468,22 +460,20 @@ export const PropertyViewPage = () => {
         if (res.data.files) {
           const imgFiles = res.data.files.filter((pf: any) => pf.fileType === 'image');
           const docFiles = res.data.files.filter((pf: any) => pf.fileType === 'document');
-          const imgs = await Promise.all(imgFiles.map(async (pf: any) => {
-            try {
-              const urlResp = await api.get(`/files/${pf.file.id}/url`);
-              return { id: pf.file.id, url: urlResp.data.url, name: pf.file.originalName };
-            } catch {
-              return { id: pf.file.id, url: pf.file.path, name: pf.file.originalName };
-            }
+          // Backend PropertiesService enrichPropertyFiles() already fills pf.file.path
+          // with the presigned S3 URL (or our placeholder SVG on any failure).
+          // So we don't need a second roundtrip to /files/:id/url.
+          const imgs = imgFiles.map((pf: any) => ({
+            id: pf.file.id,
+            url: (pf.file.path as string) || '',
+            name: pf.file.originalName,
           }));
           setImages(imgs);
-          const docs = await Promise.all(docFiles.map(async (pf: any) => {
-            try {
-              const urlResp = await api.get(`/files/${pf.file.id}/url`);
-              return { id: pf.file.id, name: pf.file.originalName, size: pf.file.size, url: urlResp.data.url };
-            } catch {
-              return { id: pf.file.id, name: pf.file.originalName, size: pf.file.size, url: pf.file.path };
-            }
+          const docs = docFiles.map((pf: any) => ({
+            id: pf.file.id,
+            name: pf.file.originalName,
+            size: pf.file.size,
+            url: (pf.file.path as string) || '',
           }));
           setDocuments(docs);
         }

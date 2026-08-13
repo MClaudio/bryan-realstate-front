@@ -27,17 +27,9 @@ export const FilesManagementPage = () => {
     try {
       const response = await api.get('/files');
       const files = response.data;
-      const withUrls = await Promise.all(
-        files.map(async (f: any) => {
-          try {
-            const urlResp = await api.get(`/files/${f.id}/url`);
-            return { ...f, path: urlResp.data.url };
-          } catch {
-            return f;
-          }
-        })
-      );
-      setFiles(withUrls);
+      // /files endpoint NOW RETURNS ENRICHED URLs (S3 presigned or placeholder)
+      // via backend `enrichFile()`. No need for 2nd call `/files/:id/url`.
+      setFiles(files);
     } catch (error) {
       console.error('Error fetching files:', error);
     } finally {

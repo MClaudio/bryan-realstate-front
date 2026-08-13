@@ -49,20 +49,12 @@ const DetailModal = ({
   const [fileUrls, setFileUrls] = useState<{ id: string; name: string; url: string }[]>([]);
 
   useEffect(() => {
-    const load = async () => {
-      const results = await Promise.all(
-        (process.files || []).map(async (pf) => {
-          try {
-            const r = await api.get(`/files/${pf.file.id}/url`);
-            return { id: pf.file.id, name: pf.file.originalName, url: r.data.url };
-          } catch {
-            return { id: pf.file.id, name: pf.file.originalName, url: '' };
-          }
-        })
-      );
-      setFileUrls(results);
-    };
-    load();
+    const results = (process.files || []).map((pf: any) => ({
+      id: pf.file.id,
+      name: pf.file.originalName,
+      url: (pf.file.path as string) || '',
+    }));
+    setFileUrls(results);
   }, [process]);
 
   const expenses: Expense[] = Array.isArray(process.expenses) ? process.expenses : [];
@@ -216,18 +208,14 @@ const FormModal = ({
       nextStep: editProcess.nextStep || '',
     });
 
-    // Fetch signed URLs first, then populate FileUpload with proper URLs
+    // Backend PropertiesService + FilesService enrich pf.file.path to S3 signed URLs
+    // or placeholder. No need for an extra /files/:id/url roundtrip per file.
     const loadFiles = async () => {
-      const results = await Promise.all(
-        (editProcess.files || []).map(async (pf) => {
-          try {
-            const r = await api.get(`/files/${pf.file.id}/url`);
-            return { id: pf.file.id, url: r.data.url, name: pf.file.originalName };
-          } catch {
-            return { id: pf.file.id, url: pf.file.path, name: pf.file.originalName };
-          }
-        })
-      );
+      const results = (editProcess.files || []).map((pf: any) => ({
+        id: pf.file.id,
+        url: (pf.file.path as string) || '',
+        name: pf.file.originalName,
+      }));
       setInitialFiles(results);
       setFileIds(results.map((f) => f.id));
     };
