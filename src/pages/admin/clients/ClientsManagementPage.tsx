@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Search, User, Phone, Mail, Calendar, RefreshCcw, X, ContactRound } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, User, Phone, Mail, Calendar, RefreshCcw, X, ContactRound, CheckCircle2, AlertTriangle } from 'lucide-react';
 import api from '../../../services/api';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { alertConfirm, alertError, toastSuccess } from '../../../utils/alerts';
@@ -54,6 +54,16 @@ interface SyncResult {
   exclusionsStored: number;
 }
 
+interface GoogleStatus {
+  connected: boolean;
+  needsReauth: boolean;
+  hasRefreshToken: boolean;
+  expiresAt: string | null;
+  lastRefreshAt: string | null;
+  lastSyncAt: string | null;
+  lastError: string | null;
+}
+
 export const ClientsManagementPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -69,10 +79,21 @@ export const ClientsManagementPage = () => {
   const [previewData, setPreviewData] = useState<GooglePreviewResponse | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
 
   useEffect(() => {
     fetchClients();
+    fetchGoogleStatus();
   }, []);
+
+  const fetchGoogleStatus = async () => {
+    try {
+      const response = await api.get<GoogleStatus>('/sync/google-status');
+      setGoogleStatus(response.data);
+    } catch (error) {
+      console.error('Error fetching Google status:', error);
+    }
+  };
 
   const fetchClients = async () => {
     try {
@@ -164,6 +185,7 @@ export const ClientsManagementPage = () => {
     );
 
     void openSyncModal();
+    void fetchGoogleStatus();
   }, [location.pathname, location.search, navigate]);
 
   const toggleSelected = (candidateId: string) => {
@@ -207,7 +229,7 @@ export const ClientsManagementPage = () => {
 
       setSyncResult(response.data);
       toastSuccess('Sincronización completada');
-      await Promise.all([fetchClients(), fetchPreview()]);
+      await Promise.all([fetchClients(), fetchPreview(), fetchGoogleStatus()]);
     } catch (error: any) {
       console.error('Error syncing google contacts:', error);
       const msg = error.response?.data?.message || 'No se pudo completar la sincronización.';
@@ -222,6 +244,24 @@ export const ClientsManagementPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Gestión de Clientes</h1>
         <div className="flex items-center gap-3">
+          {googleStatus && (
+            googleStatus.connected ? (
+              <span
+                className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg"
+                title={googleStatus.lastRefreshAt ? `Última renovación: ${new Date(googleStatus.lastRefreshAt).toLocaleString()}` : undefined}
+              >
+                <CheckCircle2 size={14} /> Google conectado
+              </span>
+            ) : (
+              <button
+                onClick={openGoogleAuthModal}
+                className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg hover:bg-amber-100"
+                title={googleStatus.lastError ?? 'Es necesario reconectar la cuenta de Google'}
+              >
+                <AlertTriangle size={14} /> Reconexión requerida
+              </button>
+            )
+          )}
           <button
             onClick={openSyncModal}
             className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2"
