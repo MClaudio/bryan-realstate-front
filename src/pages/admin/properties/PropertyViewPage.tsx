@@ -3,7 +3,7 @@ import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import api from '../../../services/api';
 import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, User, X, Plus, Heart, Trash2, Star, Sparkles, ImageIcon, ListChecks, RotateCcw, Copy, FileText } from 'lucide-react';
-import { toastError, toastSuccess } from '../../../utils/alerts';
+import { alertInfo, toastError, toastSuccess } from '../../../utils/alerts';
 import { PROPERTY_STATUS_LABELS } from '../../../utils/propertyEnums';
 import { PropertyChecklistModal } from './PropertyChecklistModal';
 import { PropertyChecklistSummary } from './PropertyChecklistSummary';
@@ -619,10 +619,21 @@ export const PropertyViewPage = () => {
     if (!id) return;
     try {
       setRunningRecommendations(true);
-      const response = await api.post(`/properties/${id}/recommendations`, { enqueue: false, persist: true });
+      // Runs in the background: with many clients a synchronous run outlasts the request timeout.
+      const response = await api.post(`/properties/${id}/recommendations`, { enqueue: true, persist: true });
 
+      if (response?.data?.recommendationAlreadyRunning) {
+        alertInfo(
+          'La recomendación ya se está ejecutando',
+          'Hay una recomendación IA en curso para esta propiedad. Recibirás una notificación cuando termine.',
+        );
+        return;
+      }
       if (response?.data?.recommendationQueued) {
-        toastSuccess('La recomendación IA se está procesando en segundo plano.');
+        alertInfo(
+          'Recomendación en segundo plano',
+          'La recomendación IA se está ejecutando en segundo plano. Puedes seguir trabajando; recibirás una notificación cuando termine.',
+        );
         return;
       }
 
