@@ -1070,7 +1070,7 @@ export const PropertyViewPage = () => {
               <div className="text-2xl font-bold text-blue-600">${Number(property.price).toLocaleString()}</div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                 {property.minPrice && <div><span className="text-gray-500">Mín:</span> ${Number(property.minPrice).toLocaleString()}</div>}
-                {property.maxPrice && <div><span className="text-gray-500">Máx:</span> ${Number(property.maxPrice).toLocaleString()}</div>}
+                {/* {property.maxPrice && <div><span className="text-gray-500">Máx:</span> ${Number(property.maxPrice).toLocaleString()}</div>} */}
                 {property.commission && <div className="col-span-2 flex items-center gap-1 text-gray-700"><BadgePercent size={16} /> Comisión {Number(property.commission)}%</div>}
                 {property.salePrice && <div className="col-span-2"><span className="text-gray-500">Precio de Venta:</span> ${Number(property.salePrice).toLocaleString()}</div>}
               </div>
