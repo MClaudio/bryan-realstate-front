@@ -21,11 +21,13 @@ import {
   Moon,
   Monitor,
   Check,
+  Workflow,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import api, { getApiBaseUrl } from '../../services/api';
 import Swal from 'sweetalert2';
 import { io, type Socket } from 'socket.io-client';
+import { OpenAiCreditBadge } from './OpenAiCreditBadge';
 
 interface AppConfig {
   businessName: string | null;
@@ -219,6 +221,7 @@ export const AdminLayout = () => {
     { path: '/admin/usuarios', icon: Users, label: 'Usuarios', allowed: ['ADMIN'] },
     { path: '/admin/clientes', icon: UserCheck, label: 'Clientes' },
     { path: '/admin/propiedades/gestion', icon: Building2, label: 'Propiedades' },
+    { path: '/admin/procesos', icon: Workflow, label: 'Procesos' },
     { path: '/admin/archivos', icon: FolderOpen, label: 'Archivos' },
     { path: '/admin/lista-negra', icon: ShieldX, label: 'Lista Negra' },
     { path: '/admin/configuracion', icon: Settings, label: 'Configuración' },
@@ -380,6 +383,7 @@ export const AdminLayout = () => {
             </h1>
           </div>
           <div className="flex items-center gap-4">
+            <OpenAiCreditBadge />
             <div className="relative" ref={themeMenuRef}>
               <button
                 onClick={() => setThemeMenuOpen((prev) => !prev)}

@@ -5,26 +5,32 @@ import {
   Trash2,
   Search,
   Eye,
-  Filter,
   RefreshCw,
   Star,
   ToggleLeft,
   ToggleRight,
   Building,
-  ClipboardList,
+  ListChecks,
 } from "lucide-react";
 import api, { resolveFileUrl } from "../../../services/api";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { alertConfirm, alertError, toastSuccess } from "../../../utils/alerts";
 import {
   PROPERTY_STATUS_LABELS,
   PROPERTY_STATUS_COLORS,
 } from "../../../utils/propertyEnums";
+import { PropertyChecklistModal } from "./PropertyChecklistModal";
+import { ProgressBar } from "../../../components/common/ProgressBar";
+import {
+  PAYMENT_METHOD_LABELS,
+  type SaleProcess,
+} from "../../../utils/saleProcess";
 
 interface Property {
   id: string;
   code: string;
   address: string;
+  owner?: string | null;
   cityId?: string | null;
   referenceSector?: string | null;
   price: number;
@@ -32,6 +38,7 @@ interface Property {
   status: string;
   isFeatured: boolean;
   isActive: boolean;
+  isPublic: boolean;
   city?: {
     id: string;
     name: string;
@@ -55,10 +62,16 @@ interface Property {
 export const PropertiesManagementPage = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [checklistProperty, setChecklistProperty] = useState<Property | null>(
+    null,
+  );
+  const [saleProcesses, setSaleProcesses] = useState<
+    Record<string, SaleProcess>
+  >({});
 
   useEffect(() => {
     fetchProperties();
@@ -69,6 +82,15 @@ export const PropertiesManagementPage = () => {
       setLoading(true);
       const response = await api.get("/properties");
       setProperties(response.data);
+      // Progress bars are non-critical: the list still shows if this fails.
+      api
+        .get<SaleProcess[]>("/sale-processes")
+        .then((res) =>
+          setSaleProcesses(
+            Object.fromEntries(res.data.map((p) => [p.propertyId, p])),
+          ),
+        )
+        .catch(() => setSaleProcesses({}));
     } catch (error) {
       console.error("Error fetching properties:", error);
       alertError("Error", "No se pudieron cargar las propiedades");
@@ -96,14 +118,16 @@ export const PropertiesManagementPage = () => {
     }
   };
 
-  const toggleActive = async (id: string, currentStatus: boolean) => {
+  const togglePublic = async (id: string, currentStatus: boolean) => {
     try {
-      await api.patch(`/properties/${id}`, { isActive: !currentStatus });
-      toastSuccess(`Propiedad ${!currentStatus ? "activada" : "desactivada"}`);
+      await api.patch(`/properties/${id}`, { isPublic: !currentStatus });
+      toastSuccess(
+        `Propiedad ${!currentStatus ? "publicada" : "retirada de la web pública"}`,
+      );
       fetchProperties();
     } catch (error) {
-      console.error("Error updating active status:", error);
-      alertError("Error", "No se pudo actualizar el estado activo");
+      console.error("Error updating public status:", error);
+      alertError("Error", "No se pudo actualizar la publicación");
     }
   };
 
@@ -189,53 +213,41 @@ export const PropertiesManagementPage = () => {
             />
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Filter size={20} /> Filtros
-            </button>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="lg:w-48 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Filtrar por estado"
+          >
+            <option value="">Todos los estados</option>
+            {propertyStatuses.map((status) => (
+              <option key={status} value={status}>
+                {PROPERTY_STATUS_LABELS[status] ?? status}
+              </option>
+            ))}
+          </select>
 
-            <button
-              onClick={fetchProperties}
-              className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <RefreshCw size={20} /> Actualizar
-            </button>
-          </div>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="lg:w-48 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Filtrar por tipo"
+          >
+            <option value="">Todos los tipos</option>
+            {propertyTypes.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={fetchProperties}
+            className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw size={20} /> Actualizar
+          </button>
         </div>
-
-        {/* Advanced Filters */}
-        {showFilters && (
-          <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos los estados</option>
-              {propertyStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {PROPERTY_STATUS_LABELS[status] ?? status}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos los tipos</option>
-              {propertyTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       {/* Results Summary */}
@@ -292,7 +304,19 @@ export const PropertiesManagementPage = () => {
           {filteredProperties.map((property) => (
             <div
               key={property.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+              role="link"
+              tabIndex={0}
+              onClick={(e) => {
+                // Buttons and links inside the card keep their own action.
+                if ((e.target as HTMLElement).closest("a, button")) return;
+                navigate(`/admin/propiedades/ver/${property.id}`);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && e.target === e.currentTarget) {
+                  navigate(`/admin/propiedades/ver/${property.id}`);
+                }
+              }}
+              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {/* Property Image */}
               <div className="relative h-48 bg-gray-100">
@@ -317,22 +341,22 @@ export const PropertiesManagementPage = () => {
                   </span>
                 </div>
 
-                {/* Active/Inactive Toggle */}
+                {/* Public/Private Toggle */}
                 <div className="absolute top-3 right-3">
                   <button
-                    onClick={() => toggleActive(property.id, property.isActive)}
+                    onClick={() => togglePublic(property.id, property.isPublic)}
                     className={`p-2 rounded-full transition-colors ${
-                      property.isActive
+                      property.isPublic
                         ? "bg-green-100 text-green-600"
                         : "bg-gray-100 text-gray-400"
                     }`}
                     title={
-                      property.isActive
-                        ? "Propiedad activa"
-                        : "Propiedad inactiva"
+                      property.isPublic
+                        ? "Pública (clic para ocultar de la web)"
+                        : "No pública (clic para publicar)"
                     }
                   >
-                    {property.isActive ? (
+                    {property.isPublic ? (
                       <ToggleRight size={16} />
                     ) : (
                       <ToggleLeft size={16} />
@@ -374,6 +398,23 @@ export const PropertiesManagementPage = () => {
                   </p>
                 </div>
 
+                {saleProcesses[property.id] && (
+                  <div className="mb-4 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
+                    <div className="text-xs font-semibold text-gray-600 mb-1">
+                      Proceso ·{" "}
+                      {
+                        PAYMENT_METHOD_LABELS[
+                          saleProcesses[property.id].paymentMethod
+                        ]
+                      }
+                    </div>
+                    <ProgressBar
+                      value={saleProcesses[property.id].progress}
+                      size="sm"
+                    />
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                   {/* <div className="flex items-center gap-2">
@@ -407,13 +448,13 @@ export const PropertiesManagementPage = () => {
                     >
                       <Eye size={16} />
                     </Link>
-                    <Link
-                      to={`/admin/propiedades/procesos/${property.id}`}
-                      className="p-2 text-gray-400 hover:text-purple-600 transition-colors"
-                      title="Procesos"
+                    <button
+                      className="p-2 text-gray-400 hover:text-emerald-600 transition-colors"
+                      title="Checklist"
+                      onClick={() => setChecklistProperty(property)}
                     >
-                      <ClipboardList size={16} />
-                    </Link>
+                      <ListChecks size={16} />
+                    </button>
                     <Link
                       to={`/admin/propiedades/editar/${property.id}`}
                       className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
@@ -434,6 +475,13 @@ export const PropertiesManagementPage = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {checklistProperty && (
+        <PropertyChecklistModal
+          property={checklistProperty}
+          onClose={() => setChecklistProperty(null)}
+        />
       )}
     </div>
   );

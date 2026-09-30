@@ -1,9 +1,114 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import api from '../../../services/api';
-import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, Clock, ChevronRight as ChevronRightIcon, DollarSign, FileText, User, Briefcase, X, ClipboardList, Plus, Heart, Trash2, Star, Sparkles } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, User, X, Plus, Heart, Trash2, Star, Sparkles, ImageIcon, ListChecks, RotateCcw, Copy } from 'lucide-react';
 import { toastError, toastSuccess } from '../../../utils/alerts';
 import { PROPERTY_STATUS_LABELS } from '../../../utils/propertyEnums';
+import { PropertyChecklistModal } from './PropertyChecklistModal';
+import { PropertyChecklistSummary } from './PropertyChecklistSummary';
+import { SaleProcessCard } from '../processes/SaleProcessCard';
+
+/** Response of POST /properties/:id/recommendations and …/restore-last. */
+interface RecommendationRunResponse {
+  status?: 'applied' | 'no_changes' | 'no_candidates' | 'preview' | 'skipped' | 'failed';
+  recommendedCandidates?: unknown;
+  reconcile?: { summary?: { created?: number; updated?: number; deleted?: number; discarded?: number } } | null;
+  error?: string | null;
+}
+
+// ─── Image lightbox ──────────────────────────────────────────────────────────
+interface GalleryImage { id: string; url: string; name: string }
+
+const ImageLightbox = ({
+  images,
+  index,
+  onChange,
+  onClose,
+}: {
+  images: GalleryImage[];
+  index: number;
+  onChange: (index: number) => void;
+  onClose: () => void;
+}) => {
+  const count = images.length;
+  const prev = useCallback(() => onChange((index - 1 + count) % count), [index, count, onChange]);
+  const next = useCallback(() => onChange((index + 1) % count), [index, count, onChange]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') prev();
+      else if (e.key === 'ArrowRight') next();
+    };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [prev, next, onClose]);
+
+  const image = images[index];
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/90" onClick={onClose}>
+      <div className="flex items-center justify-between px-4 py-3 text-white/90 text-sm" onClick={(e) => e.stopPropagation()}>
+        <span className="truncate pr-4">{image.name}</span>
+        <div className="flex items-center gap-4 flex-none">
+          <span>{index + 1} / {count}</span>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10" title="Cerrar">
+            <X size={22} />
+          </button>
+        </div>
+      </div>
+
+      <div className="relative flex-1 min-h-0 flex items-center justify-center px-4 sm:px-16">
+        <img
+          src={image.url}
+          alt={image.name}
+          className="max-h-full max-w-full object-contain select-none"
+          onClick={(e) => e.stopPropagation()}
+        />
+        {count > 1 && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); prev(); }}
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/15 hover:bg-white/30 text-white p-3 rounded-full"
+              title="Anterior"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); next(); }}
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/15 hover:bg-white/30 text-white p-3 rounded-full"
+              title="Siguiente"
+            >
+              <ChevronRight size={24} />
+            </button>
+          </>
+        )}
+      </div>
+
+      {count > 1 && (
+        <div className="flex gap-2 overflow-x-auto px-4 py-3 justify-start sm:justify-center" onClick={(e) => e.stopPropagation()}>
+          {images.map((img, i) => (
+            <button
+              key={img.id}
+              onClick={() => onChange(i)}
+              className={`flex-none w-16 h-16 rounded-md overflow-hidden border-2 transition-opacity ${
+                i === index ? 'border-white opacity-100' : 'border-transparent opacity-50 hover:opacity-80'
+              }`}
+            >
+              <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ─── Interest types ──────────────────────────────────────────────────────────
 type InterestLevel = 'Bajo' | 'Medio' | 'Alto' | 'MuyAlto';
@@ -268,145 +373,18 @@ const RecommendedCandidatesModal = ({
   );
 };
 
-// ─── Process types ────────────────────────────────────────────────────────────
-interface Expense { amount: number; description: string }
-interface ProcessFile { file: { id: string; originalName: string; path: string; size: number } }
-interface Process {
-  id: string;
-  title: string;
-  type: 'Comprador' | 'Vendedor';
-  description: string;
-  expenses: Expense[];
-  approximateTime?: string;
-  nextStep?: string;
-  createdAt: string;
-  files: ProcessFile[];
-}
-
-// ─── Process Detail Modal ─────────────────────────────────────────────────────
-const ProcessDetailModal = ({ process, onClose }: { process: Process; onClose: () => void }) => {
-  const [fileUrls, setFileUrls] = useState<{ id: string; name: string; url: string }[]>([]);
-
-  useEffect(() => {
-    const results = (process.files || []).map((pf: any) => ({
-      id: pf.file.id,
-      name: pf.file.originalName,
-      url: (pf.file.path as string) || '',
-    }));
-    setFileUrls(results);
-  }, [process]);
-
-  const expenses: Expense[] = Array.isArray(process.expenses) ? process.expenses : [];
-  const isComprador = process.type === 'Comprador';
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-start justify-between p-6 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${isComprador ? 'bg-blue-100' : 'bg-emerald-100'}`}>
-              {isComprador ? <User size={20} className="text-blue-600" /> : <Briefcase size={20} className="text-emerald-600" />}
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">{process.title}</h2>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                isComprador ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-              }`}>{process.type}</span>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="overflow-y-auto flex-1 p-6 space-y-5">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Descripción</h3>
-            <p className="text-gray-800 whitespace-pre-line">{process.description}</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {process.approximateTime && (
-              <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-2">
-                <Clock size={16} className="text-gray-500" />
-                <div>
-                  <div className="text-xs text-gray-500">Tiempo Aproximado</div>
-                  <div className="text-sm font-medium">{process.approximateTime}</div>
-                </div>
-              </div>
-            )}
-            {process.nextStep && (
-              <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-2">
-                <ChevronRightIcon size={16} className="text-gray-500" />
-                <div>
-                  <div className="text-xs text-gray-500">Siguiente Paso</div>
-                  <div className="text-sm font-medium">{process.nextStep}</div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {expenses.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Gastos</h3>
-              <div className="space-y-2">
-                {expenses.map((e, i) => (
-                  <div key={i} className="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-lg px-4 py-2">
-                    <span className="text-sm text-gray-700">{e.description}</span>
-                    <span className="font-semibold text-amber-700">${Number(e.amount).toLocaleString()}</span>
-                  </div>
-                ))}
-                <div className="flex justify-end pt-1">
-                  <span className="text-sm font-bold text-gray-900">
-                    Total: ${expenses.reduce((s, e) => s + Number(e.amount), 0).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {fileUrls.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Archivos</h3>
-              <div className="space-y-2">
-                {fileUrls.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <FileText size={16} className="text-gray-500" />
-                      <span className="text-sm text-gray-700 truncate">{f.name}</span>
-                    </div>
-                    {f.url && (
-                      <a href={f.url} target="_blank" rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs px-2 py-1 border rounded hover:bg-gray-100 transition-colors">
-                        <Download size={14} /> Descargar
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="text-xs text-gray-400 pt-2">
-            Registrado el {new Date(process.createdAt).toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export const PropertyViewPage = () => {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [current, setCurrent] = useState(0);
-  const [images, setImages] = useState<{ id: string; url: string; name: string }[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [images, setImages] = useState<GalleryImage[]>([]);
+  const [showChecklist, setShowChecklist] = useState(false);
+  // Bumped when the checklist modal closes so the summary re-fetches.
+  const [checklistVersion, setChecklistVersion] = useState(0);
   const [documents, setDocuments] = useState<{ id: string; name: string; size: number; url: string }[]>([]);
-  const [processes, setProcesses] = useState<Process[]>([]);
-  const [detailProcess, setDetailProcess] = useState<Process | null>(null);
   const [interests, setInterests] = useState<PropertyInterest[]>([]);
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [showInterestForm, setShowInterestForm] = useState(false);
@@ -415,6 +393,8 @@ export const PropertyViewPage = () => {
   const [recommendedCandidates, setRecommendedCandidates] = useState<RecommendedCandidate[]>([]);
   const [savingRecommendations, setSavingRecommendations] = useState(false);
   const [runningRecommendations, setRunningRecommendations] = useState(false);
+  const [lastRecommendation, setLastRecommendation] = useState<{ candidates: number; createdAt: string } | null>(null);
+  const [restoringRecommendation, setRestoringRecommendation] = useState(false);
 
   const extractCoordsFromUrl = (url: string): { lat: number; lng: number } | null => {
     // For place URLs, use the LAST !3d!4d pair (actual place pin, not viewport or nearby results)
@@ -458,7 +438,10 @@ export const PropertyViewPage = () => {
         const res = await api.get(`/properties/${id}`);
         setProperty(res.data);
         if (res.data.files) {
-          const imgFiles = res.data.files.filter((pf: any) => pf.fileType === 'image');
+          const imgFiles = res.data.files
+            .filter((pf: any) => pf.fileType === 'image')
+            .sort((a: any, b: any) =>
+              (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER));
           const docFiles = res.data.files.filter((pf: any) => pf.fileType === 'document');
           // Backend PropertiesService enrichPropertyFiles() already fills pf.file.path
           // with the presigned S3 URL (or our placeholder SVG on any failure).
@@ -477,11 +460,6 @@ export const PropertyViewPage = () => {
           }));
           setDocuments(docs);
         }
-        // Fetch processes
-        try {
-          const procRes = await api.get(`/processes?propertyId=${id}`);
-          setProcesses(procRes.data);
-        } catch { /* non-critical */ }
         // Fetch interests
         try {
           const intRes = await api.get(`/property-interests?propertyId=${id}`);
@@ -500,8 +478,7 @@ export const PropertyViewPage = () => {
     : (typeof property?.basicServices === 'string' ? (() => { try { return JSON.parse(property.basicServices) } catch { return [] } })() : []);
   const mapsEmbed = buildMapsEmbedUrl(property?.locationUrl, Number(property?.latitude), Number(property?.longitude));
 
-  const prev = () => setCurrent((c) => (images.length ? (c - 1 + images.length) % images.length : 0));
-  const next = () => setCurrent((c) => (images.length ? (c + 1) % images.length : 0));
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
 
   const loadClients = async () => {
     if (clients.length > 0) return;
@@ -622,6 +599,11 @@ export const PropertyViewPage = () => {
       return bDate - aDate;
     });
 
+  useEffect(() => {
+    if (interests.length === 0) refreshLastRecommendation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, interests.length]);
+
   const refreshInterests = async () => {
     if (!id) return;
     try {
@@ -644,33 +626,63 @@ export const PropertyViewPage = () => {
       }
 
       await refreshInterests();
-
-      const candidates = normalizeRecommendedCandidates(response?.data?.recommendedCandidates);
-      const summary = response?.data?.reconcile?.summary ?? null;
-      const created = Number(summary?.created ?? 0);
-      const updated = Number(summary?.updated ?? 0);
-      const deleted = Number(summary?.deleted ?? 0);
-
-      if (candidates.length === 0) {
-        toastSuccess('La recomendación IA finalizó. No se encontraron candidatos para actualizar.');
-        return;
-      }
-
-      const hasChanges = created || updated || deleted;
-
-      if (hasChanges) {
-        toastSuccess(
-          `Recomendación IA aplicada: ${candidates.length} candidato(s). ${created} nuevo(s), ${updated} actualizado(s), ${deleted} removido(s). Revisa la lista “Clientes Interesados”.`,
-        );
-      } else {
-        toastSuccess(
-          `Recomendación IA finalizada: se analizaron ${candidates.length} candidato(s). La lista “Clientes Interesados” ya está al día.`,
-        );
-      }
-    } catch (error) {
+      await refreshLastRecommendation();
+      showRecommendationResult(response?.data);
+    } catch {
       toastError('No se pudo ejecutar la recomendación manual.');
     } finally {
       setRunningRecommendations(false);
+    }
+  };
+
+  /** Same wording as the backend notifications (recommendation-runner.service.ts). */
+  const showRecommendationResult = (data?: RecommendationRunResponse) => {
+    const status: string = data?.status ?? '';
+    const candidates = normalizeRecommendedCandidates(data?.recommendedCandidates);
+    const summary = data?.reconcile?.summary ?? null;
+    const created = Number(summary?.created ?? 0);
+    const updated = Number(summary?.updated ?? 0);
+    const deleted = Number(summary?.deleted ?? 0);
+    const discarded = Number(summary?.discarded ?? 0);
+    const discardedText = discarded
+      ? ` ${discarded} recomendado(s) se descartaron porque no existen en Clientes.`
+      : '';
+
+    if (status === 'failed') {
+      toastError(`Recomendación IA no completada: ${data?.error ?? 'error desconocido'}. La lista de interesados no se modificó.`);
+    } else if (status === 'no_candidates') {
+      toastSuccess('La IA no encontró clientes para esta propiedad. La lista de interesados no se modificó.');
+    } else if (status === 'applied') {
+      toastSuccess(`Recomendación IA aplicada: ${created} nuevo(s), ${updated} actualizado(s), ${deleted} removido(s).${discardedText}`);
+    } else {
+      toastSuccess(`Se analizaron ${candidates.length} cliente(s); la lista de interesados ya estaba al día.${discardedText}`);
+    }
+  };
+
+  const refreshLastRecommendation = async () => {
+    if (!id) return;
+    try {
+      const res = await api.get(`/properties/${id}/recommendations/last`);
+      setLastRecommendation(res.data?.available ? res.data : null);
+    } catch {
+      setLastRecommendation(null);
+    }
+  };
+
+  const handleRestoreLastRecommendation = async () => {
+    if (!id) return;
+    try {
+      setRestoringRecommendation(true);
+      const response = await api.post(`/properties/${id}/recommendations/restore-last`);
+      await refreshInterests();
+      showRecommendationResult(response?.data);
+    } catch (error) {
+      toastError(
+        (isAxiosError(error) && error.response?.data?.message) ||
+          'No se pudo restaurar la recomendación.',
+      );
+    } finally {
+      setRestoringRecommendation(false);
     }
   };
 
@@ -724,40 +736,58 @@ export const PropertyViewPage = () => {
 
   return (
     <div className="p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Link to="/admin/propiedades/gestion" className="p-2 hover:bg-gray-100 rounded-full">
-          <ArrowLeft size={20} />
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-800">Propiedad {property.code}</h1>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <Link to="/admin/propiedades/gestion" className="p-2 hover:bg-gray-100 rounded-full">
+            <ArrowLeft size={20} />
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-800">Propiedad {property.code}</h1>
+        </div>
+        <button
+          onClick={() => setShowChecklist(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+        >
+          <ListChecks size={16} /> Checklist
+        </button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="relative h-[420px] bg-gray-100">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <ImageIcon size={20} className="text-gray-500" /> Fotos
+              {images.length > 0 && <span className="text-sm font-normal text-gray-400">({images.length})</span>}
+            </h2>
+          </div>
           {images.length > 0 ? (
-            <>
-              <img src={images[current].url} alt={images[current].name} className="w-full h-full object-cover" />
-              <button onClick={prev} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow hover:bg-white">
-                <ChevronLeft size={22} />
-              </button>
-              <button onClick={next} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow hover:bg-white">
-                <ChevronRight size={22} />
-              </button>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                {images.map((_, i) => (
-                  <span
-                    key={i}
-                    className={`w-2 h-2 rounded-full ${i === current ? 'bg-blue-600' : 'bg-white/70'} border border-white`}
-                    onClick={() => setCurrent(i)}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {images.map((img, i) => (
+                <button
+                  key={img.id}
+                  type="button"
+                  onClick={() => setLightboxIndex(i)}
+                  className="group relative aspect-square rounded-lg overflow-hidden bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title={img.name}
+                >
+                  <img
+                    src={img.url}
+                    alt={img.name}
+                    loading="lazy"
+                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                   />
-                ))}
-              </div>
-            </>
+                  {i === 0 && (
+                    <span className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
+                      Portada
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-500">Sin imágenes</div>
+            <div className="flex items-center justify-center h-32 rounded-lg bg-gray-50 border border-dashed border-gray-200 text-gray-400 text-sm">
+              Sin imágenes
+            </div>
           )}
-          <span className="absolute top-4 right-4 bg-white/90 px-3 py-1 rounded-full text-sm font-bold text-gray-800">
-            {property.code}
-          </span>
         </div>
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -823,6 +853,36 @@ export const PropertyViewPage = () => {
                 </div>
               </div>
             )}
+            {(property.publicShortDescription || property.publicLongDescription) && (
+              <div className="space-y-4 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
+                <h3 className="text-lg font-medium">Descripción pública (para el cliente)</h3>
+                {[
+                  { label: 'Descripción corta', text: property.publicShortDescription as string | null },
+                  { label: 'Descripción larga', text: property.publicLongDescription as string | null },
+                ]
+                  .filter((item) => item.text)
+                  .map((item) => (
+                    <div key={item.label}>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-sm font-medium text-gray-600">{item.label}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard
+                              .writeText(item.text ?? '')
+                              .then(() => toastSuccess(`${item.label} copiada`))
+                              .catch(() => toastError('No se pudo copiar'));
+                          }}
+                          className="flex items-center gap-1 text-sm text-indigo-700 hover:underline"
+                        >
+                          <Copy size={14} /> Copiar
+                        </button>
+                      </div>
+                      <p className="text-gray-700 whitespace-pre-line">{item.text}</p>
+                    </div>
+                  ))}
+              </div>
+            )}
             {property.features && (
               <div>
                 <h3 className="text-lg font-medium mb-2">Descripción</h3>
@@ -850,6 +910,15 @@ export const PropertyViewPage = () => {
                   <a href={property.locationUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Ver en Google Maps</a>
                 </div>
               )
+            )}
+
+            {/* ── Document Checklist ───────────────────────────────── */}
+            {id && (
+              <PropertyChecklistSummary
+                key={checklistVersion}
+                propertyId={id}
+                onOpen={() => setShowChecklist(true)}
+              />
             )}
 
             {/* ── Interested Clients ───────────────────────────────── */}
@@ -889,6 +958,23 @@ export const PropertyViewPage = () => {
                   >
                     <Plus size={14} /> Registrar interés
                   </button>
+                  {lastRecommendation && lastRecommendation.candidates > 0 && (
+                    <div className="mt-3">
+                      <button
+                        onClick={handleRestoreLastRecommendation}
+                        disabled={restoringRecommendation}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                      >
+                        <RotateCcw size={14} />
+                        {restoringRecommendation
+                          ? 'Restaurando...'
+                          : `Restaurar última recomendación IA (${lastRecommendation.candidates})`}
+                      </button>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Del {new Date(lastRecommendation.createdAt).toLocaleString('es-EC')}. No vuelve a consultar a la IA.
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -938,96 +1024,8 @@ export const PropertyViewPage = () => {
               )}
             </div>
 
-            {/* ── Process Timeline ─────────────────────────────────── */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium">Procesos</h3>
-                <Link
-                  to={`/admin/propiedades/procesos/${id}`}
-                  className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  <Plus size={15} /> Nuevo proceso
-                </Link>
-              </div>
-
-              {processes.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                  <ClipboardList size={32} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-sm text-gray-400">Sin procesos registrados</p>
-                  <Link
-                    to={`/admin/propiedades/procesos/${id}`}
-                    className="inline-flex items-center gap-1 mt-3 text-sm text-blue-600 hover:underline"
-                  >
-                    <Plus size={14} /> Agregar proceso
-                  </Link>
-                </div>
-              ) : (
-                <div className="relative">
-                  <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-200" />
-                  <div className="space-y-3">
-                    {processes.map((proc, idx) => {
-                      const expenses: Expense[] = Array.isArray(proc.expenses) ? proc.expenses : [];
-                      const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
-                      const isComprador = proc.type === 'Comprador';
-                      return (
-                        <div key={proc.id} className="relative pl-14">
-                          <div className={`absolute left-3 top-4 w-5 h-5 rounded-full border-2 flex items-center justify-center
-                            ${isComprador ? 'bg-blue-600 border-blue-600' : 'bg-emerald-500 border-emerald-500'}`}>
-                            <span className="text-white text-xs font-bold">{idx + 1}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setDetailProcess(proc)}
-                            className="w-full text-left bg-gray-50 hover:bg-white border border-gray-200 hover:border-blue-200 hover:shadow-sm rounded-xl p-4 transition-all group"
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                isComprador ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                              }`}>{proc.type}</span>
-                              <h4 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-sm">{proc.title}</h4>
-                            </div>
-                            <p className="text-xs text-gray-500 line-clamp-2 mb-2">{proc.description}</p>
-                            <div className="flex flex-wrap gap-2">
-                              {expenses.length > 0 && (
-                                <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full">
-                                  <DollarSign size={11} /> {expenses.length} gasto{expenses.length !== 1 ? 's' : ''} · ${total.toLocaleString()}
-                                </span>
-                              )}
-                              {proc.approximateTime && (
-                                <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                  <Clock size={11} /> {proc.approximateTime}
-                                </span>
-                              )}
-                              {proc.nextStep && (
-                                <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">
-                                  <ChevronRightIcon size={11} /> {proc.nextStep}
-                                </span>
-                              )}
-                              {proc.files?.length > 0 && (
-                                <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                  <FileText size={11} /> {proc.files.length} archivo{proc.files.length !== 1 ? 's' : ''}
-                                </span>
-                              )}
-                            </div>
-                            <div className="mt-2 text-xs text-gray-400">
-                              {new Date(proc.createdAt).toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })}
-                            </div>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-4 text-center">
-                    <Link
-                      to={`/admin/propiedades/procesos/${id}`}
-                      className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      <ClipboardList size={15} /> Ver todos los procesos
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* ── Sale Process ──────────────────────────────────────── */}
+            {id && <SaleProcessCard propertyId={id} />}
           </div>
           <div className="space-y-4">
             <div className="bg-gray-50 rounded-lg p-4">
@@ -1067,8 +1065,23 @@ export const PropertyViewPage = () => {
         </div>
       </div>
 
-      {detailProcess && (
-        <ProcessDetailModal process={detailProcess} onClose={() => setDetailProcess(null)} />
+      {lightboxIndex !== null && images[lightboxIndex] && (
+        <ImageLightbox
+          images={images}
+          index={lightboxIndex}
+          onChange={setLightboxIndex}
+          onClose={closeLightbox}
+        />
+      )}
+
+      {showChecklist && (
+        <PropertyChecklistModal
+          property={property}
+          onClose={() => {
+            setShowChecklist(false);
+            setChecklistVersion((v) => v + 1);
+          }}
+        />
       )}
 
       {showInterestForm && id && (
