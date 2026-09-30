@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import api from '../../../services/api';
-import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, User, X, Plus, Heart, Trash2, Star, Sparkles, ImageIcon, ListChecks, RotateCcw, Copy } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, User, X, Plus, Heart, Trash2, Star, Sparkles, ImageIcon, ListChecks, RotateCcw, Copy, FileText } from 'lucide-react';
 import { toastError, toastSuccess } from '../../../utils/alerts';
 import { PROPERTY_STATUS_LABELS } from '../../../utils/propertyEnums';
 import { PropertyChecklistModal } from './PropertyChecklistModal';
@@ -395,6 +395,7 @@ export const PropertyViewPage = () => {
   const [runningRecommendations, setRunningRecommendations] = useState(false);
   const [lastRecommendation, setLastRecommendation] = useState<{ candidates: number; createdAt: string } | null>(null);
   const [restoringRecommendation, setRestoringRecommendation] = useState(false);
+  const [generatingProposal, setGeneratingProposal] = useState(false);
 
   const extractCoordsFromUrl = (url: string): { lat: number; lng: number } | null => {
     // For place URLs, use the LAST !3d!4d pair (actual place pin, not viewport or nearby results)
@@ -731,6 +732,32 @@ export const PropertyViewPage = () => {
     }
   };
 
+  /** Genera en el backend la propuesta de valor (PDF) y la abre en otra pestaña para imprimir/descargar. */
+  const handleGenerateProposal = async () => {
+    if (!id) return;
+    // Open the tab synchronously (inside the click) so popup blockers allow it.
+    const tab = window.open('', '_blank');
+    setGeneratingProposal(true);
+    try {
+      const res = await api.get(`/properties/${id}/proposal-pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      if (tab && !tab.closed) {
+        tab.location.href = url;
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Propuesta-${property?.code ?? id}.pdf`;
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      tab?.close();
+      toastError('No se pudo generar la propuesta en PDF.');
+    } finally {
+      setGeneratingProposal(false);
+    }
+  };
+
   if (loading) return <div className="p-8">Cargando...</div>;
   if (!property) return <div className="p-8">Propiedad no encontrada</div>;
 
@@ -743,12 +770,22 @@ export const PropertyViewPage = () => {
           </Link>
           <h1 className="text-2xl font-bold text-gray-800">Propiedad {property.code}</h1>
         </div>
-        <button
-          onClick={() => setShowChecklist(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
-        >
-          <ListChecks size={16} /> Checklist
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleGenerateProposal}
+            disabled={generatingProposal}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium transition-colors disabled:opacity-60"
+            title="Generar propuesta de valor en PDF para el cliente"
+          >
+            <FileText size={16} /> {generatingProposal ? 'Generando...' : 'Propuesta PDF'}
+          </button>
+          <button
+            onClick={() => setShowChecklist(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+          >
+            <ListChecks size={16} /> Checklist
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
