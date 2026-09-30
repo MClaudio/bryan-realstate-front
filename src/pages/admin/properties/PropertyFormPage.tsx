@@ -209,6 +209,7 @@ export const PropertyFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [generatingDescriptions, setGeneratingDescriptions] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [_property, setProperty] = useState<Property | null>(null);
   const fileIdsRef = useRef<string[]>([]);
@@ -279,6 +280,8 @@ export const PropertyFormPage = () => {
       zone: "Urbano",
       cityTime: "",
       observations: "",
+      publicShortDescription: "",
+      publicLongDescription: "",
       maxPrice: 0,
       minPrice: 0,
       commission: 0,
@@ -296,6 +299,7 @@ export const PropertyFormPage = () => {
   });
 
   const watchedStatus = useWatch({ control, name: "status" });
+  const watchedShortDescription = useWatch({ control, name: "publicShortDescription" });
   const watchedCode = useWatch({ control, name: "code" }) as string;
   const watchedCityId = useWatch({ control, name: "cityId" }) as string;
   const watchedReferenceSector = useWatch({
@@ -556,6 +560,8 @@ export const PropertyFormPage = () => {
           zone: propertyData.zone,
           cityTime: propertyData.cityTime ?? "",
           observations: propertyData.observations,
+          publicShortDescription: propertyData.publicShortDescription || "",
+          publicLongDescription: propertyData.publicLongDescription || "",
           maxPrice: propertyData.maxPrice,
           minPrice: propertyData.minPrice,
           commission: propertyData.commission,
@@ -787,6 +793,54 @@ export const PropertyFormPage = () => {
       setSavingRecommendations(false);
     }
   }, [navigate, recommendedCandidates, savedPropertyId]);
+
+  // Genera con IA las descripciones públicas con los datos actuales del formulario.
+  // No envía precio mínimo, precio máximo, comisión ni propietario. No guarda: el usuario revisa y guarda.
+  const handleGenerateDescriptions = async () => {
+    const values = getValues();
+    const currentShort = String(values.publicShortDescription ?? "").trim();
+    const currentLong = String(values.publicLongDescription ?? "").trim();
+    if (
+      (currentShort || currentLong) &&
+      !window.confirm("Se reemplazarán las descripciones públicas actuales. ¿Continuar?")
+    ) {
+      return;
+    }
+
+    const payload = {
+      propertyType: values.propertyType,
+      cityId: values.cityId || undefined,
+      referenceSector: values.referenceSector,
+      address: values.address,
+      zone: values.zone,
+      topography: values.topography,
+      landArea: values.landArea,
+      constructionArea: values.constructionArea,
+      constructionYears: values.constructionYears,
+      hasBasicServices: values.hasBasicServices,
+      basicServices: values.basicServices,
+      cityTime: values.cityTime,
+      features: values.features ?? "",
+      observations: values.observations ?? "",
+      price: values.price,
+    };
+
+    setGeneratingDescriptions(true);
+    try {
+      const { data } = await api.post("/properties/generate-descriptions", payload);
+      setValue("publicShortDescription", data.publicShortDescription, { shouldDirty: true });
+      setValue("publicLongDescription", data.publicLongDescription, { shouldDirty: true });
+      toastSuccess("Descripciones generadas, revisa y guarda");
+    } catch (error: any) {
+      console.error("Error generating descriptions:", error);
+      alertError(
+        "Error al generar",
+        error.response?.data?.message || "No se pudieron generar las descripciones con IA.",
+      );
+    } finally {
+      setGeneratingDescriptions(false);
+    }
+  };
 
   const onSubmit = async (data: Record<string, any>) => {
     try {
@@ -1686,6 +1740,59 @@ export const PropertyFormPage = () => {
                   className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   placeholder="Observaciones adicionales..."
                 />
+              </div>
+
+              {/* Descripciones públicas: lo que se envía al cliente */}
+              <div className="md:col-span-2 border-t pt-4 mt-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Descripción pública
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleGenerateDescriptions}
+                    disabled={generatingDescriptions || loading}
+                    className="flex items-center gap-2 px-4 py-2 border border-indigo-300 text-indigo-700 rounded-md hover:bg-indigo-50 disabled:opacity-50"
+                    title="Genera las descripciones con la información de la propiedad (sin precio mínimo ni comisión)"
+                  >
+                    <Sparkles size={18} />
+                    {generatingDescriptions ? "Generando..." : "Generar con IA"}
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">
+                  Es lo que se envía al cliente. Se genera con IA a partir de toda la información
+                  (principalmente Características), sin precio mínimo ni comisión. Si guardas con
+                  ambas vacías, se generan automáticamente.
+                </p>
+
+                <div className="grid grid-cols-1 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Descripción corta pública
+                      <span className="ml-2 text-xs font-normal text-gray-500">
+                        (un solo mensaje · {String(watchedShortDescription ?? "").length} caracteres)
+                      </span>
+                    </label>
+                    <textarea
+                      {...register("publicShortDescription")}
+                      rows={7}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      placeholder="Mensaje breve con la información clave para enviar al cliente..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Descripción larga pública
+                    </label>
+                    <textarea
+                      {...register("publicLongDescription")}
+                      rows={10}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      placeholder="Descripción completa de la propiedad para el cliente..."
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

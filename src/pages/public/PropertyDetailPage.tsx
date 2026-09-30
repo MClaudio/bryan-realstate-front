@@ -154,10 +154,12 @@ export const PropertyDetailPage = () => {
                 </div>
               </div>
             )}
-            {property.features && (
+            {(property.publicLongDescription || property.features) && (
               <div>
                 <h3 className="text-lg font-medium mb-2">Descripción</h3>
-                <p className="text-gray-700 whitespace-pre-line">{property.features}</p>
+                <p className="text-gray-700 whitespace-pre-line">
+                  {property.publicLongDescription || property.features}
+                </p>
               </div>
             )}
             {mapsEmbed ? (

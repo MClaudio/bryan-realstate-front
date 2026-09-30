@@ -15,7 +15,10 @@ import { DashboardPage } from './pages/admin/DashboardPage';
 import { PropertiesManagementPage } from './pages/admin/properties/PropertiesManagementPage';
 import { PropertyFormPage } from './pages/admin/properties/PropertyFormPage';
 import { PropertyViewPage } from './pages/admin/properties/PropertyViewPage';
-import { ProcessesPage } from './pages/admin/processes/ProcessesPage';
+// Legacy free-form processes: data kept in the DB, screen disabled for now.
+// import { ProcessesPage } from './pages/admin/processes/ProcessesPage';
+import { SaleProcessesPage } from './pages/admin/processes/SaleProcessesPage';
+import { SaleProcessEditPage } from './pages/admin/processes/SaleProcessEditPage';
 import { UsersManagementPage } from './pages/admin/users/UsersManagementPage';
 import { UserFormPage } from './pages/admin/users/UserFormPage';
 import { ClientsManagementPage } from './pages/admin/clients/ClientsManagementPage';
@@ -69,7 +72,9 @@ function App() {
                 <Route path="/admin/propiedades/nueva" element={<PropertyFormPage />} />
                 <Route path="/admin/propiedades/editar/:id" element={<PropertyFormPage />} />
                 <Route path="/admin/propiedades/ver/:id" element={<PropertyViewPage />} />
-                <Route path="/admin/propiedades/procesos/:propertyId" element={<ProcessesPage />} />
+                {/* <Route path="/admin/propiedades/procesos/:propertyId" element={<ProcessesPage />} /> */}
+                <Route path="/admin/procesos" element={<SaleProcessesPage />} />
+                <Route path="/admin/procesos/:propertyId" element={<SaleProcessEditPage />} />
                 
                 <Route path="/admin/archivos" element={<FilesManagementPage />} />
                 <Route path="/admin/notificaciones" element={<NotificationsPage />} />

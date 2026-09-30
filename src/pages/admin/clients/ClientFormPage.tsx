@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../../services/api';
-import { Save, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Save, ArrowLeft, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { alertError, toastSuccess } from '../../../utils/alerts';
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
 import {
@@ -16,12 +16,13 @@ export const ClientFormPage = () => {
   const isEditMode = !!id;
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [normalizing, setNormalizing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [phoneFormatted, setPhoneFormatted] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>('EC');
   
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, watch, getValues, formState: { errors } } = useForm({
     defaultValues: {
       firstName: '',
       lastName: '',
@@ -78,6 +79,52 @@ export const ClientFormPage = () => {
       fetchClient();
     }
   }, [id, isEditMode, reset]);
+
+  // Normaliza con IA los datos actuales del formulario. No guarda: el usuario revisa y pulsa Guardar.
+  const handleNormalize = async () => {
+    const values = getValues();
+    const phone = values.phone?.trim() ? formatPhoneNumber(values.phone, selectedCountry).formatted : '';
+    const payload = Object.fromEntries(
+      Object.entries({
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone,
+        email: values.email,
+        birthDate: values.birthDate,
+        address: values.address,
+        notes: values.notes,
+        interestDescription: values.interestDescription,
+      }).filter(([, value]) => typeof value === 'string' && value.trim().length > 0),
+    );
+
+    setNormalizing(true);
+    try {
+      const { data } = await api.post('/clients/normalize', payload);
+
+      const parsedPhone = data.phone ? parsePhoneNumberFromString(data.phone) : null;
+      if (parsedPhone?.country) {
+        setSelectedCountry(parsedPhone.country as CountryCode);
+      }
+
+      reset({
+        ...values,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: parsedPhone?.nationalNumber ?? values.phone,
+        email: data.email ?? values.email,
+        birthDate: data.birthDate ?? values.birthDate,
+        address: data.address ?? values.address,
+        notes: data.notes ?? '',
+        interestDescription: data.interestDescription ?? '',
+      });
+      toastSuccess('Datos normalizados, revisa y guarda');
+    } catch (error: any) {
+      console.error('Error normalizing client:', error);
+      alertError('Error al normalizar', error.response?.data?.message || 'No se pudo normalizar con IA.');
+    } finally {
+      setNormalizing(false);
+    }
+  };
 
   const onSubmit = async (data: any) => {
     setLoading(true);
@@ -165,6 +212,18 @@ export const ClientFormPage = () => {
         <h1 className="text-2xl font-bold text-gray-800">
           {isEditMode ? 'Editar Cliente' : 'Nuevo Cliente'}
         </h1>
+        {isEditMode && (
+          <button
+            type="button"
+            onClick={handleNormalize}
+            disabled={normalizing || loading}
+            className="ml-auto flex items-center gap-2 px-4 py-2 border border-indigo-300 text-indigo-700 rounded-md hover:bg-indigo-50 disabled:opacity-50"
+            title="Ordena nombre, apellido, teléfono e intereses con IA sin inventar datos"
+          >
+            <Sparkles size={18} />
+            {normalizing ? 'Normalizando...' : 'Normalizar con IA'}
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl shadow-sm p-6 max-w-4xl">
@@ -279,7 +338,7 @@ export const ClientFormPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Intereses</label>
                 <textarea
                   {...register('interestDescription')}
-                  rows={4}
+                  rows={7}
                   className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
                   placeholder="Ej: Busca una propiedad de 500m² en el centro..."
                 />
