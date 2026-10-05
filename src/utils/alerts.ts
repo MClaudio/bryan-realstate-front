@@ -16,5 +16,8 @@ export const alertConfirm = (title: string, text?: string) =>
 export const toastSuccess = (title: string) =>
   Swal.fire({ toast: true, position: 'top-end', icon: 'success', title, showConfirmButton: false, timer: 2500, timerProgressBar: true })
 
+export const toastInfo = (title: string, text?: string) =>
+  Swal.fire({ toast: true, position: 'top-end', icon: 'info', title, text, showConfirmButton: false, timer: 5000, timerProgressBar: true })
+
 export const toastError = (title: string) =>
   Swal.fire({ toast: true, position: 'top-end', icon: 'error', title, showConfirmButton: false, timer: 3000, timerProgressBar: true })

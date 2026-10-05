@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import api from '../../../services/api';
-import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, User, X, Plus, Heart, Trash2, Star, Sparkles, ImageIcon, ListChecks, RotateCcw, Copy, FileText } from 'lucide-react';
-import { alertInfo, toastError, toastSuccess } from '../../../utils/alerts';
+import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, User, X, Plus, Heart, Trash2, Star, Sparkles, ImageIcon, ListChecks, RotateCcw, Copy, FileText, ThumbsUp, ThumbsDown, ChevronDown, Undo2 } from 'lucide-react';
+import { alertConfirm, alertInfo, toastError, toastInfo, toastSuccess } from '../../../utils/alerts';
+import { ClientInfoModal, type ClientInterestContext } from '../../../components/clients/ClientInfoModal';
 import { PROPERTY_STATUS_LABELS } from '../../../utils/propertyEnums';
 import { PropertyChecklistModal } from './PropertyChecklistModal';
 import { PropertyChecklistSummary } from './PropertyChecklistSummary';
@@ -130,6 +131,7 @@ interface PropertyInterest {
   interestDate: string;
   interestLevel: InterestLevel;
   notes?: string;
+  source?: 'manual' | 'ia';
   client: ClientSummary;
 }
 
@@ -280,6 +282,114 @@ const InterestFormModal = ({
   );
 };
 
+type FeedbackRating = 'like' | 'dislike';
+type FeedbackReason = 'presupuesto' | 'ubicacion' | 'tipo' | 'tamano' | 'no_busca' | 'otro';
+
+interface RecommendationFeedback {
+  id: string;
+  clientId: string;
+  rating: FeedbackRating;
+  reason?: FeedbackReason | null;
+  comment?: string | null;
+  interestLevel?: string | null;
+  aiReason?: string | null;
+  createdAt: string;
+  client: { id: string; firstName: string; lastName: string; phone: string };
+}
+
+const FEEDBACK_REASONS: { value: FeedbackReason; label: string }[] = [
+  { value: 'presupuesto', label: 'Presupuesto' },
+  { value: 'ubicacion', label: 'Ubicación' },
+  { value: 'tipo', label: 'Tipo de propiedad' },
+  { value: 'tamano', label: 'Tamaño' },
+  { value: 'no_busca', label: 'Ya no busca / ya compró' },
+  { value: 'otro', label: 'Otro' },
+];
+const FEEDBACK_REASON_LABEL = Object.fromEntries(FEEDBACK_REASONS.map((r) => [r.value, r.label])) as Record<
+  FeedbackReason,
+  string
+>;
+
+/** Dislike: pide el motivo (obligatorio) y un comentario opcional para que la IA aprenda. */
+const DislikeModal = ({
+  clientName,
+  saving,
+  onClose,
+  onConfirm,
+}: {
+  clientName: string;
+  saving: boolean;
+  onClose: () => void;
+  onConfirm: (reason: FeedbackReason, comment: string) => void;
+}) => {
+  const [reason, setReason] = useState<FeedbackReason | null>(null);
+  const [comment, setComment] = useState('');
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <ThumbsDown size={18} className="text-red-500" /> Recomendación incorrecta
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {clientName} saldrá de la lista y la IA no volverá a recomendarlo para esta propiedad.
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:bg-gray-100" disabled={saving}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">¿Por qué no aplica? *</p>
+            <div className="flex flex-wrap gap-2">
+              {FEEDBACK_REASONS.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => setReason(r.value)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                    reason === r.value
+                      ? 'bg-red-50 border-red-300 text-red-700 font-medium'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Comentario (opcional)</label>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value.slice(0, 300))}
+              rows={3}
+              className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Ej: su presupuesto es la mitad del precio"
+            />
+            <p className="text-xs text-gray-400 text-right">{comment.length}/300</p>
+          </div>
+        </div>
+        <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => reason && onConfirm(reason, comment.trim())}
+            disabled={!reason || saving}
+            className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300"
+          >
+            {saving ? 'Guardando...' : 'Marcar como incorrecta'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const RecommendedCandidatesModal = ({
   candidates,
   saving,
@@ -293,6 +403,7 @@ const RecommendedCandidatesModal = ({
   onClose: () => void;
   onSave: () => Promise<void>;
 }) => {
+  const [infoCandidate, setInfoCandidate] = useState<RecommendedCandidate | null>(null);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -326,7 +437,14 @@ const RecommendedCandidatesModal = ({
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-900">{candidate.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => setInfoCandidate(candidate)}
+                        className="font-semibold text-gray-900 hover:text-blue-700 hover:underline text-left"
+                        title="Ver información del cliente"
+                      >
+                        {candidate.name}
+                      </button>
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold ${RECOMMENDED_LEVEL_BADGE[candidate.interest_level]}`}
                       >
@@ -369,11 +487,24 @@ const RecommendedCandidatesModal = ({
           </button>
         </div>
       </div>
+      {infoCandidate && (
+        <ClientInfoModal
+          clientId={infoCandidate.client_id}
+          onClose={() => setInfoCandidate(null)}
+          interest={{
+            level: infoCandidate.interest_level,
+            levelClassName: RECOMMENDED_LEVEL_BADGE[infoCandidate.interest_level],
+            reason: infoCandidate.reason,
+            source: 'ia',
+          }}
+        />
+      )}
     </div>
   );
 };
 
 export const PropertyViewPage = () => {
+  const [infoClient, setInfoClient] = useState<{ clientId: string; interest?: ClientInterestContext } | null>(null);
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -389,6 +520,10 @@ export const PropertyViewPage = () => {
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [showInterestForm, setShowInterestForm] = useState(false);
   const [deletingInterestId, setDeletingInterestId] = useState<string | null>(null);
+  const [feedbacks, setFeedbacks] = useState<RecommendationFeedback[]>([]);
+  const [ratingClientId, setRatingClientId] = useState<string | null>(null);
+  const [dislikeTarget, setDislikeTarget] = useState<PropertyInterest | null>(null);
+  const [showDiscarded, setShowDiscarded] = useState(false);
   const [showRecommendationsModal, setShowRecommendationsModal] = useState(false);
   const [recommendedCandidates, setRecommendedCandidates] = useState<RecommendedCandidate[]>([]);
   const [savingRecommendations, setSavingRecommendations] = useState(false);
@@ -605,6 +740,75 @@ export const PropertyViewPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, interests.length]);
 
+  const loadFeedback = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await api.get<RecommendationFeedback[]>(`/property-interests/feedback?propertyId=${id}`);
+      setFeedbacks(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      // non-critical
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void loadFeedback();
+  }, [loadFeedback]);
+
+  const feedbackByClient = new Map(feedbacks.map((f) => [f.clientId, f]));
+  const discarded = feedbacks.filter((f) => f.rating === 'dislike');
+
+  const handleLike = async (interest: PropertyInterest) => {
+    const current = feedbackByClient.get(interest.client.id);
+    setRatingClientId(interest.client.id);
+    try {
+      if (current?.rating === 'like') {
+        await api.delete(`/property-interests/feedback?propertyId=${id}&clientId=${interest.client.id}`);
+        toastInfo('Calificación quitada');
+      } else {
+        await api.post(`/property-interests/${interest.id}/feedback`, { rating: 'like' });
+        toastSuccess('Recomendación marcada como correcta');
+      }
+      await loadFeedback();
+    } catch {
+      toastError('No se pudo guardar la calificación.');
+    } finally {
+      setRatingClientId(null);
+    }
+  };
+
+  const handleConfirmDislike = async (reason: FeedbackReason, comment: string) => {
+    if (!dislikeTarget) return;
+    setRatingClientId(dislikeTarget.client.id);
+    try {
+      await api.post(`/property-interests/${dislikeTarget.id}/feedback`, {
+        rating: 'dislike',
+        reason,
+        comment: comment || undefined,
+      });
+      setInterests((prev) => prev.filter((i) => i.id !== dislikeTarget.id));
+      setDislikeTarget(null);
+      toastSuccess('La IA no volverá a recomendar a este cliente para esta propiedad');
+      await loadFeedback();
+    } catch {
+      toastError('No se pudo guardar la calificación.');
+    } finally {
+      setRatingClientId(null);
+    }
+  };
+
+  const handleUndoDislike = async (clientId: string) => {
+    setRatingClientId(clientId);
+    try {
+      await api.delete(`/property-interests/feedback?propertyId=${id}&clientId=${clientId}`);
+      toastInfo('Cliente desbloqueado: la IA podrá volver a recomendarlo');
+      await loadFeedback();
+    } catch {
+      toastError('No se pudo deshacer la calificación.');
+    } finally {
+      setRatingClientId(null);
+    }
+  };
+
   const refreshInterests = async () => {
     if (!id) return;
     try {
@@ -617,6 +821,11 @@ export const PropertyViewPage = () => {
 
   const handleRunManualRecommendations = async () => {
     if (!id) return;
+    const confirm = await alertConfirm(
+      'Ejecutar recomendación IA',
+      'Se reemplazarán las recomendaciones de la IA para esta propiedad; los interesados agregados manualmente se conservan.',
+    );
+    if (!confirm.isConfirmed) return;
     try {
       setRunningRecommendations(true);
       // Runs in the background: with many clients a synchronous run outlasts the request timeout.
@@ -630,7 +839,7 @@ export const PropertyViewPage = () => {
         return;
       }
       if (response?.data?.recommendationQueued) {
-        alertInfo(
+        toastInfo(
           'Recomendación en segundo plano',
           'La recomendación IA se está ejecutando en segundo plano. Puedes seguir trabajando; recibirás una notificación cuando termine.',
         );
@@ -1036,7 +1245,33 @@ export const PropertyViewPage = () => {
                           </div>
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-sm text-gray-900">{interest.client.firstName} {interest.client.lastName}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setInfoClient({
+                                    clientId: interest.client.id,
+                                    interest: {
+                                      level: level?.label,
+                                      levelClassName: level?.color,
+                                      date: interest.interestDate,
+                                      reason: interest.notes,
+                                      source: interest.source,
+                                    },
+                                  })
+                                }
+                                className="font-semibold text-sm text-gray-900 hover:text-pink-600 hover:underline text-left"
+                                title="Ver información del cliente"
+                              >
+                                {interest.client.firstName} {interest.client.lastName}
+                              </button>
+                              {interest.source === 'ia' && (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700"
+                                  title="Recomendado por IA"
+                                >
+                                  <Sparkles size={10} /> IA
+                                </span>
+                              )}
                               {level && (
                                 <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${level.color}`}>
                                   {Array.from({ length: level.stars }).map((_, i) => (
@@ -1057,17 +1292,87 @@ export const PropertyViewPage = () => {
                             </div>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleDeleteInterest(interest.id)}
-                          disabled={deletingInterestId === interest.id}
-                          className="p-1.5 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          {interest.source === 'ia' && (
+                            <>
+                              <button
+                                onClick={() => handleLike(interest)}
+                                disabled={ratingClientId === interest.client.id}
+                                className={`p-1.5 rounded-md transition-colors disabled:opacity-40 ${
+                                  feedbackByClient.get(interest.client.id)?.rating === 'like'
+                                    ? 'text-green-600 bg-green-50'
+                                    : 'text-gray-300 hover:text-green-600'
+                                }`}
+                                title="Recomendación correcta"
+                              >
+                                <ThumbsUp size={15} />
+                              </button>
+                              <button
+                                onClick={() => setDislikeTarget(interest)}
+                                disabled={ratingClientId === interest.client.id}
+                                className="p-1.5 rounded-md text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
+                                title="Recomendación incorrecta"
+                              >
+                                <ThumbsDown size={15} />
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => handleDeleteInterest(interest.id)}
+                            disabled={deletingInterestId === interest.id}
+                            className="p-1.5 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {discarded.length > 0 && (
+                <div className="mt-4 border-t border-gray-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowDiscarded((v) => !v)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  >
+                    <ChevronDown size={15} className={`transition-transform ${showDiscarded ? 'rotate-180' : ''}`} />
+                    Descartados por IA ({discarded.length})
+                  </button>
+                  {showDiscarded && (
+                    <div className="mt-2 space-y-2">
+                      {discarded.map((f) => (
+                        <div key={f.id} className="flex items-start justify-between gap-3 bg-red-50/40 border border-red-100 rounded-xl px-4 py-2.5">
+                          <div className="min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => setInfoClient({ clientId: f.client.id })}
+                              className="font-semibold text-sm text-gray-800 hover:text-pink-600 hover:underline text-left"
+                            >
+                              {f.client.firstName} {f.client.lastName}
+                            </button>
+                            <p className="text-xs text-red-700 mt-0.5">
+                              {f.reason ? FEEDBACK_REASON_LABEL[f.reason] : 'Incorrecta'}
+                              {f.comment ? ` · ${f.comment}` : ''}
+                            </p>
+                            {f.aiReason && <p className="text-xs text-gray-500 italic mt-0.5">IA: {f.aiReason}</p>}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleUndoDislike(f.clientId)}
+                            disabled={ratingClientId === f.clientId}
+                            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 disabled:opacity-40 shrink-0"
+                            title="Permitir que la IA vuelva a recomendarlo"
+                          >
+                            <Undo2 size={13} /> Deshacer
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1148,6 +1453,23 @@ export const PropertyViewPage = () => {
           onRemove={handleRemoveCandidate}
           onClose={() => setShowRecommendationsModal(false)}
           onSave={handleSaveRecommendedCandidates}
+        />
+      )}
+
+      {dislikeTarget && (
+        <DislikeModal
+          clientName={`${dislikeTarget.client.firstName} ${dislikeTarget.client.lastName}`}
+          saving={ratingClientId === dislikeTarget.client.id}
+          onClose={() => setDislikeTarget(null)}
+          onConfirm={handleConfirmDislike}
+        />
+      )}
+
+      {infoClient && (
+        <ClientInfoModal
+          clientId={infoClient.clientId}
+          interest={infoClient.interest}
+          onClose={() => setInfoClient(null)}
         />
       )}
     </div>
