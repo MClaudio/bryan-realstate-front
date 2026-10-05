@@ -10,6 +10,7 @@ import {
   STAGE_STATE_LABELS,
   formatDate,
   formatMoney,
+  isManualStage,
   stageState,
   type PaymentMethod,
   type SaleProcess,
@@ -88,9 +89,9 @@ const CurrentStage = ({ process }: { process: SaleProcess }) => {
               </dd>
             </div>
           </dl>
-          {current.stage === "Municipio" && current.hasData && (
+          {isManualStage(current.stage) && current.hasData && (
             <p className="text-xs text-blue-800">
-              Falta marcar Municipio como completado (paso manual).
+              Falta marcar {current.label} como completado (paso manual).
             </p>
           )}
         </div>

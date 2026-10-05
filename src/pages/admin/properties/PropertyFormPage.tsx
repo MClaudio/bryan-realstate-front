@@ -319,7 +319,10 @@ export const PropertyFormPage = () => {
   });
 
   const watchedStatus = useWatch({ control, name: "status" });
-  const watchedShortDescription = useWatch({ control, name: "publicShortDescription" });
+  const watchedShortDescription = useWatch({
+    control,
+    name: "publicShortDescription",
+  });
   const watchedCode = useWatch({ control, name: "code" }) as string;
   const watchedCityId = useWatch({ control, name: "cityId" }) as string;
   const watchedReferenceSector = useWatch({
@@ -650,7 +653,7 @@ export const PropertyFormPage = () => {
                   ...f,
                   file: {
                     ...f.file,
-                    path: (f.file.path as string) || '',
+                    path: (f.file.path as string) || "",
                   },
                 };
               },
@@ -822,7 +825,9 @@ export const PropertyFormPage = () => {
     const currentLong = String(values.publicLongDescription ?? "").trim();
     if (
       (currentShort || currentLong) &&
-      !window.confirm("Se reemplazarán las descripciones públicas actuales. ¿Continuar?")
+      !window.confirm(
+        "Se reemplazarán las descripciones públicas actuales. ¿Continuar?",
+      )
     ) {
       return;
     }
@@ -847,15 +852,23 @@ export const PropertyFormPage = () => {
 
     setGeneratingDescriptions(true);
     try {
-      const { data } = await api.post("/properties/generate-descriptions", payload);
-      setValue("publicShortDescription", data.publicShortDescription, { shouldDirty: true });
-      setValue("publicLongDescription", data.publicLongDescription, { shouldDirty: true });
+      const { data } = await api.post(
+        "/properties/generate-descriptions",
+        payload,
+      );
+      setValue("publicShortDescription", data.publicShortDescription, {
+        shouldDirty: true,
+      });
+      setValue("publicLongDescription", data.publicLongDescription, {
+        shouldDirty: true,
+      });
       toastSuccess("Descripciones generadas, revisa y guarda");
     } catch (error: any) {
       console.error("Error generating descriptions:", error);
       alertError(
         "Error al generar",
-        error.response?.data?.message || "No se pudieron generar las descripciones con IA.",
+        error.response?.data?.message ||
+          "No se pudieron generar las descripciones con IA.",
       );
     } finally {
       setGeneratingDescriptions(false);
@@ -898,14 +911,16 @@ export const PropertyFormPage = () => {
         ? await api.patch(`/properties/${id}`, payload)
         : await api.post("/properties", payload);
 
-
       toastSuccess(
         isEditMode
           ? "Propiedad actualizada exitosamente"
           : "Propiedad creada exitosamente",
       );
 
-      if (response?.data?.recommendationQueued && response?.data?.recommendationQueued !== "") {
+      if (
+        response?.data?.recommendationQueued &&
+        response?.data?.recommendationQueued !== ""
+      ) {
         toastSuccess(
           "La recomendación IA se está procesando en segundo plano.",
         );
@@ -1276,7 +1291,7 @@ export const PropertyFormPage = () => {
                 watchedStatus === "Vendido") && (
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cliente <span className="text-red-500">*</span>
+                    Cliente *
                   </label>
                   {/* Hidden field for react-hook-form validation */}
                   <input
@@ -1780,9 +1795,10 @@ export const PropertyFormPage = () => {
                   </button>
                 </div>
                 <p className="text-sm text-gray-500 mb-4">
-                  Es lo que se envía al cliente. Se genera con IA a partir de toda la información
-                  (principalmente Características), sin precio mínimo ni comisión. Si guardas con
-                  ambas vacías, se generan automáticamente.
+                  Es lo que se envía al cliente. Se genera con IA a partir de
+                  toda la información (principalmente Características), sin
+                  precio mínimo ni comisión. Si guardas con ambas vacías, se
+                  generan automáticamente.
                 </p>
 
                 <div className="grid grid-cols-1 gap-6">
@@ -1790,7 +1806,9 @@ export const PropertyFormPage = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Descripción corta pública
                       <span className="ml-2 text-xs font-normal text-gray-500">
-                        (un solo mensaje · {String(watchedShortDescription ?? "").length} caracteres)
+                        (un solo mensaje ·{" "}
+                        {String(watchedShortDescription ?? "").length}{" "}
+                        caracteres)
                       </span>
                     </label>
                     <textarea

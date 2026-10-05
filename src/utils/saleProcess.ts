@@ -47,6 +47,10 @@ export type StageState = "done" | "partial" | "empty";
 export const stageState = (s: SaleProcessStage): StageState =>
   s.completed ? "done" : s.hasData ? "partial" : "empty";
 
+/** Stages completed by hand with a checkbox (mirrors MANUAL_STAGES in the backend). */
+export const isManualStage = (stage: SaleStage): boolean =>
+  stage === "Cooperativa" || stage === "Municipio";
+
 export const STAGE_STATE_LABELS: Record<StageState, string> = {
   done: "Completo",
   partial: "En curso",
