@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { alertError, toastSuccess, toastError } from "../../../utils/alerts";
 import { FileUpload } from "../../../components/common/FileUpload";
+import { ClientInfoModal } from "../../../components/clients/ClientInfoModal";
 import { PROPERTY_STATUS_LABELS } from "../../../utils/propertyEnums";
 
 interface Property {
@@ -116,6 +117,8 @@ const RecommendedCandidatesModal = ({
   onClose: () => void;
   onSave: () => Promise<void>;
 }) => {
+  const [infoCandidate, setInfoCandidate] =
+    useState<RecommendedCandidate | null>(null);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -156,9 +159,14 @@ const RecommendedCandidatesModal = ({
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-900">
+                      <button
+                        type="button"
+                        onClick={() => setInfoCandidate(candidate)}
+                        className="font-semibold text-gray-900 hover:text-blue-700 hover:underline text-left"
+                        title="Ver información del cliente"
+                      >
                         {candidate.name}
-                      </p>
+                      </button>
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold ${INTEREST_LEVEL_BADGE[candidate.interest_level]}`}
                       >
@@ -201,6 +209,18 @@ const RecommendedCandidatesModal = ({
           </button>
         </div>
       </div>
+      {infoCandidate && (
+        <ClientInfoModal
+          clientId={infoCandidate.client_id}
+          onClose={() => setInfoCandidate(null)}
+          interest={{
+            level: infoCandidate.interest_level,
+            levelClassName: INTEREST_LEVEL_BADGE[infoCandidate.interest_level],
+            reason: infoCandidate.reason,
+            source: "ia",
+          }}
+        />
+      )}
     </div>
   );
 };
