@@ -889,7 +889,7 @@ export const PropertyFormPage = () => {
           [],
         // Send negotiationClientId when status is Negociación or Vendido; clear it otherwise
         negotiationClientId:
-          (data.status === "Negociación" || data.status === "Vendido") &&
+          (data.status === "Negociacion" || data.status === "Vendido") &&
           data.negotiationClientId
             ? data.negotiationClientId
             : null,
