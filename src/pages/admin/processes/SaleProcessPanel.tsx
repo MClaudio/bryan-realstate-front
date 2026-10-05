@@ -10,6 +10,7 @@ import {
   STAGE_STATE_LABELS,
   formatDate,
   formatMoney,
+  isManualStage,
   stageState,
   type PaymentMethod,
   type RegistryStatus,
@@ -60,7 +61,7 @@ export const StageDots = ({ process }: { process: SaleProcess }) => (
 // ─── Stage card ──────────────────────────────────────────────────────────────
 const STAGE_HINTS: Record<SaleProcessStage["stage"], string> = {
   Sena: "Se completa automáticamente cuando el monto de seña es mayor a 0.",
-  Cooperativa: "Se completa automáticamente al guardar una observación.",
+  Cooperativa: "Paso manual: se completa solo al marcar la casilla.",
   Municipio: "Paso manual: se completa solo al marcar la casilla.",
   Notaria: "Se completa automáticamente al guardar una observación.",
   Registro: "Ingreso y Devolutiva quedan en curso. Se completa cuando el estado es Inscrita.",
@@ -88,7 +89,7 @@ const StatusBadge = ({ stage }: { stage: SaleProcessStage }) => {
     );
   }
   const detail =
-    state === "partial" && stage.stage === "Municipio"
+    state === "partial" && isManualStage(stage.stage)
       ? " · falta marcar"
       : state === "partial" && stage.stage === "Registro" && stage.registryStatus
         ? ` · ${stage.registryStatus}`
@@ -277,8 +278,8 @@ const StageCard = ({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {stage.stage === "Municipio" ? (
-          <label className="inline-flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-dashed border-blue-300 bg-blue-50 text-sm font-semibold text-blue-900 cursor-pointer">
+        {isManualStage(stage.stage) ? (
+          <label className="inline-flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-dashed border-blue-300 bg-blue-50 text-sm font-semibold text-blue-700 cursor-pointer">
             <input
               type="checkbox"
               className="h-4 w-4 accent-green-600"
@@ -288,11 +289,11 @@ const StageCard = ({
                 // Send the observation too so an unsaved one isn't lost.
                 patch(
                   { completed: e.target.checked, observation: observation.trim() || null },
-                  e.target.checked ? "Municipio completado" : "Municipio desmarcado",
+                  e.target.checked ? `${stage.label} completado` : `${stage.label} desmarcado`,
                 )
               }
             />
-            Marcar Municipio como completado
+            Marcar {stage.label} como completado
           </label>
         ) : (
           <span className="text-xs text-gray-500">{STAGE_HINTS[stage.stage]}</span>
@@ -305,7 +306,7 @@ const StageCard = ({
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold transition-colors"
           >
             {saving && <Loader2 size={14} className="animate-spin" />}
-            {stage.stage === "Municipio" ? "Guardar observación" : "Guardar"}
+            {isManualStage(stage.stage) ? "Guardar observación" : "Guardar"}
           </button>
         </div>
       </div>
