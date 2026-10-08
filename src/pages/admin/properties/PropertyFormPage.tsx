@@ -18,7 +18,11 @@ import {
 import { alertError, toastSuccess, toastError } from "../../../utils/alerts";
 import { FileUpload } from "../../../components/common/FileUpload";
 import { ClientInfoModal } from "../../../components/clients/ClientInfoModal";
-import { PROPERTY_STATUS_LABELS } from "../../../utils/propertyEnums";
+import {
+  PROPERTY_STATUS_LABELS,
+  PROPERTY_TYPE_LABELS,
+  ZONE_LABELS,
+} from "../../../utils/propertyEnums";
 
 interface Property {
   id: string;
@@ -1005,12 +1009,11 @@ export const PropertyFormPage = () => {
   const propertyTypeOptions = useMemo(
     () => (
       <>
-        <option value="Casa">Casa</option>
-        <option value="Terreno">Terreno</option>
-        <option value="Casa y terreno">Casa y terreno</option>
-        <option value="Departamento">Departamento</option>
-        <option value="Finca">Finca</option>
-        <option value="Lote">Lote</option>
+        {Object.entries(PROPERTY_TYPE_LABELS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
       </>
     ),
     [],
@@ -1048,9 +1051,11 @@ export const PropertyFormPage = () => {
   const zoneOptions = useMemo(
     () => (
       <>
-        <option value="Urbano">Urbano</option>
-        <option value="Rural">Rural</option>
-        <option value="Urbanización">Urbanización</option>
+        {Object.entries(ZONE_LABELS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
       </>
     ),
     [],
