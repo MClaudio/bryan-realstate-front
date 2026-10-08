@@ -18,6 +18,7 @@ import { alertConfirm, alertError, toastSuccess } from "../../../utils/alerts";
 import {
   PROPERTY_STATUS_LABELS,
   PROPERTY_STATUS_COLORS,
+  PROPERTY_TYPE_LABELS,
 } from "../../../utils/propertyEnums";
 import { PropertyChecklistModal } from "./PropertyChecklistModal";
 import { ProgressBar } from "../../../components/common/ProgressBar";
@@ -165,14 +166,7 @@ export const PropertiesManagementPage = () => {
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  const propertyTypes = [
-    "Casa",
-    "Terreno",
-    "Casa y terreno",
-    "Departamento",
-    "Finca",
-    "Lote",
-  ];
+  const propertyTypes = Object.keys(PROPERTY_TYPE_LABELS);
   const propertyStatuses = ["Validacion", "Nuevo", "Negociacion", "Vendido"];
 
   return (
@@ -236,7 +230,7 @@ export const PropertiesManagementPage = () => {
             <option value="">Todos los tipos</option>
             {propertyTypes.map((type) => (
               <option key={type} value={type}>
-                {type}
+                {PROPERTY_TYPE_LABELS[type]}
               </option>
             ))}
           </select>
@@ -384,7 +378,8 @@ export const PropertiesManagementPage = () => {
                     )}
                   </div>
                   <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
-                    {property.propertyType}
+                    {PROPERTY_TYPE_LABELS[property.propertyType] ??
+                      property.propertyType}
                   </span>
                 </div>
 
