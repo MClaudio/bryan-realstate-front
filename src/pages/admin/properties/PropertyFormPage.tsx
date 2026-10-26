@@ -12,12 +12,10 @@ import {
   Image as ImageIcon,
   Share2,
   Sparkles,
-  Trash2,
   X,
 } from "lucide-react";
 import { alertError, toastSuccess, toastError } from "../../../utils/alerts";
 import { FileUpload } from "../../../components/common/FileUpload";
-import { ClientInfoModal } from "../../../components/clients/ClientInfoModal";
 import {
   PROPERTY_STATUS_LABELS,
   PROPERTY_TYPE_LABELS,
@@ -61,31 +59,6 @@ interface CityOption {
   name: string;
 }
 
-type RecommendedInterestLevel = "ALTO" | "MEDIO" | "BAJO";
-
-interface RecommendedCandidate {
-  client_id: string;
-  name: string;
-  interest_level: RecommendedInterestLevel;
-  reason: string;
-  score?: number;
-}
-
-const INTEREST_LEVEL_TO_PRISMA: Record<
-  RecommendedInterestLevel,
-  "Alto" | "Medio" | "Bajo"
-> = {
-  ALTO: "Alto",
-  MEDIO: "Medio",
-  BAJO: "Bajo",
-};
-
-const INTEREST_LEVEL_BADGE: Record<RecommendedInterestLevel, string> = {
-  ALTO: "bg-red-100 text-red-700",
-  MEDIO: "bg-yellow-100 text-yellow-700",
-  BAJO: "bg-gray-100 text-gray-700",
-};
-
 const sanitizePropertyCodeSegment = (value: string) =>
   value.trim().replace(/\s+/g, "");
 
@@ -106,127 +79,6 @@ const buildPropertyCode = ({
   }
 
   return `${citySegment}-${sectorSegment}-${sequence}`;
-};
-
-const RecommendedCandidatesModal = ({
-  candidates,
-  saving,
-  onRemove,
-  onClose,
-  onSave,
-}: {
-  candidates: RecommendedCandidate[];
-  saving: boolean;
-  onRemove: (clientId: string) => void;
-  onClose: () => void;
-  onSave: () => Promise<void>;
-}) => {
-  const [infoCandidate, setInfoCandidate] =
-    useState<RecommendedCandidate | null>(null);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-full bg-blue-100">
-              <Sparkles size={18} className="text-blue-700" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">
-                Clientes recomendados por IA
-              </h2>
-              <p className="text-sm text-gray-500">
-                Revisa la lista, elimina los que no apliquen y guarda.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-            disabled={saving}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-5 overflow-y-auto space-y-3">
-          {candidates.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
-              No quedan candidatos en la lista.
-            </div>
-          ) : (
-            candidates.map((candidate) => (
-              <div
-                key={candidate.client_id}
-                className="rounded-xl border border-gray-200 p-4"
-              >
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setInfoCandidate(candidate)}
-                        className="font-semibold text-gray-900 hover:text-blue-700 hover:underline text-left"
-                        title="Ver información del cliente"
-                      >
-                        {candidate.name}
-                      </button>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${INTEREST_LEVEL_BADGE[candidate.interest_level]}`}
-                      >
-                        {candidate.interest_level}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-700">{candidate.reason}</p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => onRemove(candidate.client_id)}
-                    className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm border border-red-200 text-red-600 hover:bg-red-50"
-                    disabled={saving}
-                  >
-                    <Trash2 size={14} /> Eliminar
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="p-5 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            Omitir por ahora
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving || candidates.length === 0}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300"
-          >
-            {saving ? "Guardando..." : "Guardar interesados"}
-          </button>
-        </div>
-      </div>
-      {infoCandidate && (
-        <ClientInfoModal
-          clientId={infoCandidate.client_id}
-          onClose={() => setInfoCandidate(null)}
-          interest={{
-            level: infoCandidate.interest_level,
-            levelClassName: INTEREST_LEVEL_BADGE[infoCandidate.interest_level],
-            reason: infoCandidate.reason,
-            source: "ia",
-          }}
-        />
-      )}
-    </div>
-  );
 };
 
 export const PropertyFormPage = () => {
@@ -263,13 +115,6 @@ export const PropertyFormPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [showBasicServices, setShowBasicServices] = useState(false);
   const [resolvingUrl, setResolvingUrl] = useState(false);
-  const [savedPropertyId, setSavedPropertyId] = useState<string | null>(null);
-  const [recommendedCandidates, setRecommendedCandidates] = useState<
-    RecommendedCandidate[]
-  >([]);
-  const [showRecommendationsModal, setShowRecommendationsModal] =
-    useState(false);
-  const [savingRecommendations, setSavingRecommendations] = useState(false);
 
   const {
     register,
@@ -733,94 +578,6 @@ export const PropertyFormPage = () => {
     fetchProperty();
   }, [id, reset]);
 
-  const normalizeRecommendedCandidates = useCallback(
-    (payload: any): RecommendedCandidate[] => {
-      if (!Array.isArray(payload)) return [];
-
-      return payload
-        .map((item) => {
-          const rawLevel = String(item?.interest_level ?? "").toUpperCase();
-          const normalizedLevel: RecommendedInterestLevel =
-            rawLevel === "ALTO"
-              ? "ALTO"
-              : rawLevel === "BAJO"
-                ? "BAJO"
-                : "MEDIO";
-
-          return {
-            client_id: String(item?.client_id ?? "").trim(),
-            name: String(item?.name ?? "").trim(),
-            interest_level: normalizedLevel,
-            reason: String(item?.reason ?? "").trim(),
-            score:
-              item?.score !== undefined && !Number.isNaN(Number(item.score))
-                ? Number(item.score)
-                : undefined,
-          };
-        })
-        .filter((item) => item.client_id && item.name && item.reason);
-    },
-    [],
-  );
-
-  const handleRemoveCandidate = useCallback((clientId: string) => {
-    setRecommendedCandidates((prev) =>
-      prev.filter((candidate) => candidate.client_id !== clientId),
-    );
-  }, []);
-
-  const handleSaveRecommendedCandidates = useCallback(async () => {
-    if (!savedPropertyId) {
-      alertError(
-        "Error",
-        "No se pudo determinar la propiedad para guardar interesados.",
-      );
-      return;
-    }
-
-    try {
-      setSavingRecommendations(true);
-      const today = new Date().toISOString().split("T")[0];
-
-      const results = await Promise.allSettled(
-        recommendedCandidates.map((candidate) =>
-          api.post("/property-interests", {
-            propertyId: savedPropertyId,
-            clientId: candidate.client_id,
-            interestDate: today,
-            interestLevel: INTEREST_LEVEL_TO_PRISMA[candidate.interest_level],
-            notes: candidate.reason,
-          }),
-        ),
-      );
-
-      const successCount = results.filter(
-        (result) => result.status === "fulfilled",
-      ).length;
-
-      if (successCount > 0) {
-        toastSuccess(
-          `Se guardaron ${successCount} interesado(s) recomendados.`,
-        );
-      }
-
-      if (successCount !== recommendedCandidates.length) {
-        toastError("Algunos interesados no pudieron guardarse.");
-      }
-
-      setShowRecommendationsModal(false);
-      navigate("/admin/propiedades/gestion");
-    } catch (error) {
-      console.error("Error saving recommended candidates:", error);
-      alertError(
-        "Error",
-        "No se pudo guardar la lista de interesados recomendados.",
-      );
-    } finally {
-      setSavingRecommendations(false);
-    }
-  }, [navigate, recommendedCandidates, savedPropertyId]);
-
   // Genera con IA las descripciones públicas con los datos actuales del formulario.
   // No envía precio mínimo, precio máximo, comisión ni propietario. No guarda: el usuario revisa y guarda.
   const handleGenerateDescriptions = async () => {
@@ -911,9 +668,8 @@ export const PropertyFormPage = () => {
             ? data.negotiationClientId
             : null,
       };
-      const response = isEditMode
-        ? await api.patch(`/properties/${id}`, payload)
-        : await api.post("/properties", payload);
+      if (isEditMode) await api.patch(`/properties/${id}`, payload);
+      else await api.post("/properties", payload);
 
       toastSuccess(
         isEditMode
@@ -921,29 +677,7 @@ export const PropertyFormPage = () => {
           : "Propiedad creada exitosamente",
       );
 
-      if (
-        response?.data?.recommendationQueued &&
-        response?.data?.recommendationQueued !== ""
-      ) {
-        toastSuccess(
-          "La recomendación IA se está procesando en segundo plano.",
-        );
-        navigate("/admin/propiedades/gestion");
-        return;
-      }
-
-      const persistedPropertyId = response?.data?.id || id || null;
-      setSavedPropertyId(persistedPropertyId);
-
-      const candidates = normalizeRecommendedCandidates(
-        response?.data?.recommendedCandidates,
-      );
-      if (persistedPropertyId && candidates.length > 0) {
-        setRecommendedCandidates(candidates);
-        setShowRecommendationsModal(true);
-        return;
-      }
-
+      // Las recomendaciones de clientes se recalculan solas en segundo plano (sin IA).
       navigate("/admin/propiedades/gestion");
     } catch (error: any) {
       console.error("Error saving property:", error);
@@ -2038,18 +1772,6 @@ export const PropertyFormPage = () => {
         {/* Close card container */}
       </div>
 
-      {showRecommendationsModal && (
-        <RecommendedCandidatesModal
-          candidates={recommendedCandidates}
-          saving={savingRecommendations}
-          onRemove={handleRemoveCandidate}
-          onClose={() => {
-            setShowRecommendationsModal(false);
-            navigate("/admin/propiedades/gestion");
-          }}
-          onSave={handleSaveRecommendedCandidates}
-        />
-      )}
     </div>
   );
 };

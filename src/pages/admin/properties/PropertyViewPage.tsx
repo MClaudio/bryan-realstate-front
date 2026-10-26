@@ -1,22 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { isAxiosError } from 'axios';
 import api from '../../../services/api';
-import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, User, X, Plus, Heart, Trash2, Star, Sparkles, ImageIcon, ListChecks, RotateCcw, Copy, FileText, ThumbsUp, ThumbsDown, ChevronDown, Undo2 } from 'lucide-react';
-import { alertConfirm, alertInfo, toastError, toastInfo, toastSuccess } from '../../../utils/alerts';
+import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, X, Heart, ImageIcon, ListChecks, Copy, FileText } from 'lucide-react';
+import { toastError, toastSuccess } from '../../../utils/alerts';
 import { ClientInfoModal, type ClientInterestContext } from '../../../components/clients/ClientInfoModal';
 import { PROPERTY_STATUS_LABELS, PROPERTY_TYPE_LABELS, ZONE_LABELS } from '../../../utils/propertyEnums';
 import { PropertyChecklistModal } from './PropertyChecklistModal';
 import { PropertyChecklistSummary } from './PropertyChecklistSummary';
 import { SaleProcessCard } from '../processes/SaleProcessCard';
-
-/** Response of POST /properties/:id/recommendations and …/restore-last. */
-interface RecommendationRunResponse {
-  status?: 'applied' | 'no_changes' | 'no_candidates' | 'preview' | 'skipped' | 'failed';
-  recommendedCandidates?: unknown;
-  reconcile?: { summary?: { created?: number; updated?: number; deleted?: number; discarded?: number } } | null;
-  error?: string | null;
-}
+import { InterestedClientsSection } from './InterestedClientsSection';
 
 // ─── Image lightbox ──────────────────────────────────────────────────────────
 interface GalleryImage { id: string; url: string; name: string }
@@ -135,44 +127,6 @@ interface PropertyInterest {
   client: ClientSummary;
 }
 
-type RecommendedInterestLevel = 'ALTO' | 'MEDIO' | 'BAJO';
-
-interface RecommendedCandidate {
-  client_id: string;
-  name: string;
-  interest_level: RecommendedInterestLevel;
-  reason: string;
-  score?: number;
-}
-
-interface RecommendationNotification {
-  id: string;
-  path?: string | null;
-  modalKey?: string | null;
-  entityType?: string | null;
-  entityId?: string | null;
-  payload?: {
-    candidates?: unknown[];
-  };
-}
-
-const RECOMMENDATION_MODAL_KEY = 'property-interested-candidates';
-
-const INTEREST_LEVEL_TO_PRISMA: Record<
-  RecommendedInterestLevel,
-  'Alto' | 'Medio' | 'Bajo'
-> = {
-  ALTO: 'Alto',
-  MEDIO: 'Medio',
-  BAJO: 'Bajo',
-};
-
-const RECOMMENDED_LEVEL_BADGE: Record<RecommendedInterestLevel, string> = {
-  ALTO: 'bg-red-100 text-red-700',
-  MEDIO: 'bg-yellow-100 text-yellow-700',
-  BAJO: 'bg-gray-100 text-gray-700',
-};
-
 // ─── Interest Form Modal ──────────────────────────────────────────────────────
 const InterestFormModal = ({
   propertyId, clients, onClose, onSaved,
@@ -282,227 +236,6 @@ const InterestFormModal = ({
   );
 };
 
-type FeedbackRating = 'like' | 'dislike';
-type FeedbackReason = 'presupuesto' | 'ubicacion' | 'tipo' | 'tamano' | 'no_busca' | 'otro';
-
-interface RecommendationFeedback {
-  id: string;
-  clientId: string;
-  rating: FeedbackRating;
-  reason?: FeedbackReason | null;
-  comment?: string | null;
-  interestLevel?: string | null;
-  aiReason?: string | null;
-  createdAt: string;
-  client: { id: string; firstName: string; lastName: string; phone: string };
-}
-
-const FEEDBACK_REASONS: { value: FeedbackReason; label: string }[] = [
-  { value: 'presupuesto', label: 'Presupuesto' },
-  { value: 'ubicacion', label: 'Ubicación' },
-  { value: 'tipo', label: 'Tipo de propiedad' },
-  { value: 'tamano', label: 'Tamaño' },
-  { value: 'no_busca', label: 'Ya no busca / ya compró' },
-  { value: 'otro', label: 'Otro' },
-];
-const FEEDBACK_REASON_LABEL = Object.fromEntries(FEEDBACK_REASONS.map((r) => [r.value, r.label])) as Record<
-  FeedbackReason,
-  string
->;
-
-/** Dislike: pide el motivo (obligatorio) y un comentario opcional para que la IA aprenda. */
-const DislikeModal = ({
-  clientName,
-  saving,
-  onClose,
-  onConfirm,
-}: {
-  clientName: string;
-  saving: boolean;
-  onClose: () => void;
-  onConfirm: (reason: FeedbackReason, comment: string) => void;
-}) => {
-  const [reason, setReason] = useState<FeedbackReason | null>(null);
-  const [comment, setComment] = useState('');
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <ThumbsDown size={18} className="text-red-500" /> Recomendación incorrecta
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {clientName} saldrá de la lista y la IA no volverá a recomendarlo para esta propiedad.
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:bg-gray-100" disabled={saving}>
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">¿Por qué no aplica? *</p>
-            <div className="flex flex-wrap gap-2">
-              {FEEDBACK_REASONS.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  onClick={() => setReason(r.value)}
-                  className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                    reason === r.value
-                      ? 'bg-red-50 border-red-300 text-red-700 font-medium'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Comentario (opcional)</label>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value.slice(0, 300))}
-              rows={3}
-              className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Ej: su presupuesto es la mitad del precio"
-            />
-            <p className="text-xs text-gray-400 text-right">{comment.length}/300</p>
-          </div>
-        </div>
-        <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={() => reason && onConfirm(reason, comment.trim())}
-            disabled={!reason || saving}
-            className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300"
-          >
-            {saving ? 'Guardando...' : 'Marcar como incorrecta'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const RecommendedCandidatesModal = ({
-  candidates,
-  saving,
-  onRemove,
-  onClose,
-  onSave,
-}: {
-  candidates: RecommendedCandidate[];
-  saving: boolean;
-  onRemove: (clientId: string) => void;
-  onClose: () => void;
-  onSave: () => Promise<void>;
-}) => {
-  const [infoCandidate, setInfoCandidate] = useState<RecommendedCandidate | null>(null);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-full bg-blue-100">
-              <Sparkles size={18} className="text-blue-700" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">Clientes recomendados por IA</h2>
-              <p className="text-sm text-gray-500">Revisa la lista, elimina los que no apliquen y guarda.</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-            disabled={saving}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-5 overflow-y-auto space-y-3">
-          {candidates.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
-              No quedan candidatos en la lista.
-            </div>
-          ) : (
-            candidates.map((candidate) => (
-              <div key={candidate.client_id} className="rounded-xl border border-gray-200 p-4">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setInfoCandidate(candidate)}
-                        className="font-semibold text-gray-900 hover:text-blue-700 hover:underline text-left"
-                        title="Ver información del cliente"
-                      >
-                        {candidate.name}
-                      </button>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${RECOMMENDED_LEVEL_BADGE[candidate.interest_level]}`}
-                      >
-                        {candidate.interest_level}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-700">{candidate.reason}</p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => onRemove(candidate.client_id)}
-                    className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm border border-red-200 text-red-600 hover:bg-red-50"
-                    disabled={saving}
-                  >
-                    <Trash2 size={14} /> Eliminar
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="p-5 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            Omitir por ahora
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving || candidates.length === 0}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300"
-          >
-            {saving ? 'Guardando...' : 'Guardar interesados'}
-          </button>
-        </div>
-      </div>
-      {infoCandidate && (
-        <ClientInfoModal
-          clientId={infoCandidate.client_id}
-          onClose={() => setInfoCandidate(null)}
-          interest={{
-            level: infoCandidate.interest_level,
-            levelClassName: RECOMMENDED_LEVEL_BADGE[infoCandidate.interest_level],
-            reason: infoCandidate.reason,
-            source: 'ia',
-          }}
-        />
-      )}
-    </div>
-  );
-};
-
 export const PropertyViewPage = () => {
   const [infoClient, setInfoClient] = useState<{ clientId: string; interest?: ClientInterestContext } | null>(null);
   const { id } = useParams();
@@ -520,16 +253,6 @@ export const PropertyViewPage = () => {
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [showInterestForm, setShowInterestForm] = useState(false);
   const [deletingInterestId, setDeletingInterestId] = useState<string | null>(null);
-  const [feedbacks, setFeedbacks] = useState<RecommendationFeedback[]>([]);
-  const [ratingClientId, setRatingClientId] = useState<string | null>(null);
-  const [dislikeTarget, setDislikeTarget] = useState<PropertyInterest | null>(null);
-  const [showDiscarded, setShowDiscarded] = useState(false);
-  const [showRecommendationsModal, setShowRecommendationsModal] = useState(false);
-  const [recommendedCandidates, setRecommendedCandidates] = useState<RecommendedCandidate[]>([]);
-  const [savingRecommendations, setSavingRecommendations] = useState(false);
-  const [runningRecommendations, setRunningRecommendations] = useState(false);
-  const [lastRecommendation, setLastRecommendation] = useState<{ candidates: number; createdAt: string } | null>(null);
-  const [restoringRecommendation, setRestoringRecommendation] = useState(false);
   const [generatingProposal, setGeneratingProposal] = useState(false);
 
   const extractCoordsFromUrl = (url: string): { lat: number; lng: number } | null => {
@@ -624,107 +347,13 @@ export const PropertyViewPage = () => {
     } catch { /* non-critical */ }
   };
 
-  const normalizeRecommendedCandidates = useCallback((payload: any): RecommendedCandidate[] => {
-    if (!Array.isArray(payload)) return [];
-
-    return payload
-      .map((item) => {
-        const rawLevel = String(item?.interest_level ?? '').toUpperCase();
-        const normalizedLevel: RecommendedInterestLevel =
-          rawLevel === 'ALTO' ? 'ALTO' : rawLevel === 'BAJO' ? 'BAJO' : 'MEDIO';
-
-        return {
-          client_id: String(item?.client_id ?? '').trim(),
-          name: String(item?.name ?? '').trim(),
-          interest_level: normalizedLevel,
-          reason: String(item?.reason ?? '').trim(),
-          score:
-            item?.score !== undefined && !Number.isNaN(Number(item.score))
-              ? Number(item.score)
-              : undefined,
-        };
-      })
-      .filter((item) => item.client_id && item.name && item.reason);
-  }, []);
-
-  const applyRecommendationNotification = useCallback(async (
-    notification: RecommendationNotification,
-  ) => {
-    if (!id) return;
-    if (notification.entityType !== 'property') return;
-    if (String(notification.entityId ?? '') !== String(id)) return;
-
-    const candidates = normalizeRecommendedCandidates(
-      notification.payload?.candidates,
-    );
-
-    if (
-      notification.modalKey === RECOMMENDATION_MODAL_KEY &&
-      candidates.length > 0
-    ) {
-      setRecommendedCandidates(candidates);
-      setShowRecommendationsModal(true);
-    }
-
-    // Los interesados ya se guardan automáticamente desde el backend (cola).
-    // Refrescamos la lista para que el usuario vea el orden por nivel.
-    await refreshInterests();
-
-    if (notification.id) {
-      try {
-        await api.patch(`/notifications/${notification.id}/read`);
-      } catch {
-        // non-critical
-      }
-    }
-  }, [id, normalizeRecommendedCandidates]);
-
+  // Al abrir desde una notificación: marcarla como leída y limpiar la URL.
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const notificationId = params.get('notificationId');
-
-    if (!notificationId || !id) {
-      return;
-    }
-
-    const loadNotification = async () => {
-      try {
-        const res = await api.get(`/notifications/${notificationId}`);
-        await applyRecommendationNotification(res.data as RecommendationNotification);
-      } catch {
-        // non-critical
-      } finally {
-        navigate(location.pathname, { replace: true });
-      }
-    };
-
-    loadNotification();
-  }, [
-    applyRecommendationNotification,
-    id,
-    location.pathname,
-    location.search,
-    navigate,
-  ]);
-
-  useEffect(() => {
-    const onNotification = (event: Event) => {
-      const customEvent = event as CustomEvent<RecommendationNotification>;
-      if (!customEvent?.detail) return;
-
-      applyRecommendationNotification(customEvent.detail);
-    };
-
-    window.addEventListener('app:notification', onNotification as EventListener);
-
-    return () => {
-      window.removeEventListener('app:notification', onNotification as EventListener);
-    };
-  }, [applyRecommendationNotification]);
-
-  const handleRemoveCandidate = (clientId: string) => {
-    setRecommendedCandidates((prev) => prev.filter((candidate) => candidate.client_id !== clientId));
-  };
+    const notificationId = new URLSearchParams(location.search).get('notificationId');
+    if (!notificationId) return;
+    api.patch(`/notifications/${notificationId}/read`).catch(() => undefined);
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   const sortInterests = (items: PropertyInterest[]): PropertyInterest[] =>
     [...items].sort((a, b) => {
@@ -735,80 +364,6 @@ export const PropertyViewPage = () => {
       return bDate - aDate;
     });
 
-  useEffect(() => {
-    if (interests.length === 0) refreshLastRecommendation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, interests.length]);
-
-  const loadFeedback = useCallback(async () => {
-    if (!id) return;
-    try {
-      const res = await api.get<RecommendationFeedback[]>(`/property-interests/feedback?propertyId=${id}`);
-      setFeedbacks(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      // non-critical
-    }
-  }, [id]);
-
-  useEffect(() => {
-    void loadFeedback();
-  }, [loadFeedback]);
-
-  const feedbackByClient = new Map(feedbacks.map((f) => [f.clientId, f]));
-  const discarded = feedbacks.filter((f) => f.rating === 'dislike');
-
-  const handleLike = async (interest: PropertyInterest) => {
-    const current = feedbackByClient.get(interest.client.id);
-    setRatingClientId(interest.client.id);
-    try {
-      if (current?.rating === 'like') {
-        await api.delete(`/property-interests/feedback?propertyId=${id}&clientId=${interest.client.id}`);
-        toastInfo('Calificación quitada');
-      } else {
-        await api.post(`/property-interests/${interest.id}/feedback`, { rating: 'like' });
-        toastSuccess('Recomendación marcada como correcta');
-      }
-      await loadFeedback();
-    } catch {
-      toastError('No se pudo guardar la calificación.');
-    } finally {
-      setRatingClientId(null);
-    }
-  };
-
-  const handleConfirmDislike = async (reason: FeedbackReason, comment: string) => {
-    if (!dislikeTarget) return;
-    setRatingClientId(dislikeTarget.client.id);
-    try {
-      await api.post(`/property-interests/${dislikeTarget.id}/feedback`, {
-        rating: 'dislike',
-        reason,
-        comment: comment || undefined,
-      });
-      setInterests((prev) => prev.filter((i) => i.id !== dislikeTarget.id));
-      setDislikeTarget(null);
-      toastSuccess('La IA no volverá a recomendar a este cliente para esta propiedad');
-      await loadFeedback();
-    } catch {
-      toastError('No se pudo guardar la calificación.');
-    } finally {
-      setRatingClientId(null);
-    }
-  };
-
-  const handleUndoDislike = async (clientId: string) => {
-    setRatingClientId(clientId);
-    try {
-      await api.delete(`/property-interests/feedback?propertyId=${id}&clientId=${clientId}`);
-      toastInfo('Cliente desbloqueado: la IA podrá volver a recomendarlo');
-      await loadFeedback();
-    } catch {
-      toastError('No se pudo deshacer la calificación.');
-    } finally {
-      setRatingClientId(null);
-    }
-  };
-
   const refreshInterests = async () => {
     if (!id) return;
     try {
@@ -816,129 +371,6 @@ export const PropertyViewPage = () => {
       setInterests(sortInterests(Array.isArray(intRes.data) ? intRes.data : []));
     } catch {
       // non-critical
-    }
-  };
-
-  const handleRunManualRecommendations = async () => {
-    if (!id) return;
-    const confirm = await alertConfirm(
-      'Ejecutar recomendación IA',
-      'Se reemplazarán las recomendaciones de la IA para esta propiedad; los interesados agregados manualmente se conservan.',
-    );
-    if (!confirm.isConfirmed) return;
-    try {
-      setRunningRecommendations(true);
-      // Runs in the background: with many clients a synchronous run outlasts the request timeout.
-      const response = await api.post(`/properties/${id}/recommendations`, { enqueue: true, persist: true });
-
-      if (response?.data?.recommendationAlreadyRunning) {
-        alertInfo(
-          'La recomendación ya se está ejecutando',
-          'Hay una recomendación IA en curso para esta propiedad. Recibirás una notificación cuando termine.',
-        );
-        return;
-      }
-      if (response?.data?.recommendationQueued) {
-        toastInfo(
-          'Recomendación en segundo plano',
-          'La recomendación IA se está ejecutando en segundo plano. Puedes seguir trabajando; recibirás una notificación cuando termine.',
-        );
-        return;
-      }
-
-      await refreshInterests();
-      await refreshLastRecommendation();
-      showRecommendationResult(response?.data);
-    } catch {
-      toastError('No se pudo ejecutar la recomendación manual.');
-    } finally {
-      setRunningRecommendations(false);
-    }
-  };
-
-  /** Same wording as the backend notifications (recommendation-runner.service.ts). */
-  const showRecommendationResult = (data?: RecommendationRunResponse) => {
-    const status: string = data?.status ?? '';
-    const candidates = normalizeRecommendedCandidates(data?.recommendedCandidates);
-    const summary = data?.reconcile?.summary ?? null;
-    const created = Number(summary?.created ?? 0);
-    const updated = Number(summary?.updated ?? 0);
-    const deleted = Number(summary?.deleted ?? 0);
-    const discarded = Number(summary?.discarded ?? 0);
-    const discardedText = discarded
-      ? ` ${discarded} recomendado(s) se descartaron porque no existen en Clientes.`
-      : '';
-
-    if (status === 'failed') {
-      toastError(`Recomendación IA no completada: ${data?.error ?? 'error desconocido'}. La lista de interesados no se modificó.`);
-    } else if (status === 'no_candidates') {
-      toastSuccess('La IA no encontró clientes para esta propiedad. La lista de interesados no se modificó.');
-    } else if (status === 'applied') {
-      toastSuccess(`Recomendación IA aplicada: ${created} nuevo(s), ${updated} actualizado(s), ${deleted} removido(s).${discardedText}`);
-    } else {
-      toastSuccess(`Se analizaron ${candidates.length} cliente(s); la lista de interesados ya estaba al día.${discardedText}`);
-    }
-  };
-
-  const refreshLastRecommendation = async () => {
-    if (!id) return;
-    try {
-      const res = await api.get(`/properties/${id}/recommendations/last`);
-      setLastRecommendation(res.data?.available ? res.data : null);
-    } catch {
-      setLastRecommendation(null);
-    }
-  };
-
-  const handleRestoreLastRecommendation = async () => {
-    if (!id) return;
-    try {
-      setRestoringRecommendation(true);
-      const response = await api.post(`/properties/${id}/recommendations/restore-last`);
-      await refreshInterests();
-      showRecommendationResult(response?.data);
-    } catch (error) {
-      toastError(
-        (isAxiosError(error) && error.response?.data?.message) ||
-          'No se pudo restaurar la recomendación.',
-      );
-    } finally {
-      setRestoringRecommendation(false);
-    }
-  };
-
-  const handleSaveRecommendedCandidates = async () => {
-    if (!id) return;
-
-    try {
-      setSavingRecommendations(true);
-      const today = new Date().toISOString().split('T')[0];
-
-      const response = await api.post(`/property-interests/properties/${id}/reconcile`, {
-        recommendations: recommendedCandidates.map((candidate) => ({
-          clientId: candidate.client_id,
-          interestLevel: INTEREST_LEVEL_TO_PRISMA[candidate.interest_level],
-          interestDate: today,
-          notes: candidate.reason || undefined,
-        })),
-      });
-
-      const summary = response?.data?.summary;
-      const created = Number(summary?.created ?? 0);
-      const updated = Number(summary?.updated ?? 0);
-      const deleted = Number(summary?.deleted ?? 0);
-
-      toastSuccess(
-        `Interesados sincronizados: ${created} nuevo(s), ${updated} actualizado(s), ${deleted} removido(s).`,
-      );
-
-      setShowRecommendationsModal(false);
-      setRecommendedCandidates([]);
-      await refreshInterests();
-    } catch {
-      toastError('No se pudo guardar la lista de interesados recomendados.');
-    } finally {
-      setSavingRecommendations(false);
     }
   };
 
@@ -1178,204 +610,20 @@ export const PropertyViewPage = () => {
               />
             )}
 
-            {/* ── Interested Clients ───────────────────────────────── */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium flex items-center gap-2">
-                  <Heart size={18} className="text-pink-500" /> Clientes Interesados
-                  {interests.length > 0 && (
-                    <span className="ml-1 text-sm font-normal text-gray-400">({interests.length})</span>
-                  )}
-                </h3>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={handleRunManualRecommendations}
-                    disabled={runningRecommendations}
-                    className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-                  >
-                    <Sparkles size={15} />
-                    {runningRecommendations ? 'Ejecutando IA...' : 'Ejecutar recomendación IA'}
-                  </button>
-                  <button
-                    onClick={() => { loadClients(); setShowInterestForm(true); }}
-                    className="inline-flex items-center gap-1.5 text-sm text-pink-600 hover:text-pink-700 font-medium"
-                  >
-                    <Plus size={15} /> Registrar interés
-                  </button>
-                </div>
-              </div>
-
-              {interests.length === 0 ? (
-                <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                  <Heart size={28} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-sm text-gray-400">Sin clientes interesados registrados</p>
-                  <button
-                    onClick={() => { loadClients(); setShowInterestForm(true); }}
-                    className="inline-flex items-center gap-1 mt-2 text-sm text-pink-600 hover:underline"
-                  >
-                    <Plus size={14} /> Registrar interés
-                  </button>
-                  {lastRecommendation && lastRecommendation.candidates > 0 && (
-                    <div className="mt-3">
-                      <button
-                        onClick={handleRestoreLastRecommendation}
-                        disabled={restoringRecommendation}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                      >
-                        <RotateCcw size={14} />
-                        {restoringRecommendation
-                          ? 'Restaurando...'
-                          : `Restaurar última recomendación IA (${lastRecommendation.candidates})`}
-                      </button>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Del {new Date(lastRecommendation.createdAt).toLocaleString('es-EC')}. No vuelve a consultar a la IA.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {interests.map((interest) => {
-                    const level = INTEREST_LEVELS.find(l => l.value === interest.interestLevel);
-                    return (
-                      <div key={interest.id} className="flex items-start justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 hover:border-pink-200 hover:bg-white transition-all">
-                        <div className="flex items-start gap-3">
-                          <div className="p-1.5 bg-pink-50 rounded-full mt-0.5">
-                            <User size={16} className="text-pink-500" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setInfoClient({
-                                    clientId: interest.client.id,
-                                    interest: {
-                                      level: level?.label,
-                                      levelClassName: level?.color,
-                                      date: interest.interestDate,
-                                      reason: interest.notes,
-                                      source: interest.source,
-                                    },
-                                  })
-                                }
-                                className="font-semibold text-sm text-gray-900 hover:text-pink-600 hover:underline text-left"
-                                title="Ver información del cliente"
-                              >
-                                {interest.client.firstName} {interest.client.lastName}
-                              </button>
-                              {interest.source === 'ia' && (
-                                <span
-                                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700"
-                                  title="Recomendado por IA"
-                                >
-                                  <Sparkles size={10} /> IA
-                                </span>
-                              )}
-                              {level && (
-                                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${level.color}`}>
-                                  {Array.from({ length: level.stars }).map((_, i) => (
-                                    <Star key={i} size={10} fill="currentColor" />
-                                  ))}
-                                  {level.label}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {interest.client.phone}{interest.client.email ? ` · ${interest.client.email}` : ''}
-                            </div>
-                            {interest.notes && (
-                              <p className="text-xs text-gray-600 mt-1 italic">{interest.notes}</p>
-                            )}
-                            <div className="text-xs text-gray-400 mt-1">
-                              {new Date(interest.interestDate).toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' })}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          {interest.source === 'ia' && (
-                            <>
-                              <button
-                                onClick={() => handleLike(interest)}
-                                disabled={ratingClientId === interest.client.id}
-                                className={`p-1.5 rounded-md transition-colors disabled:opacity-40 ${
-                                  feedbackByClient.get(interest.client.id)?.rating === 'like'
-                                    ? 'text-green-600 bg-green-50'
-                                    : 'text-gray-300 hover:text-green-600'
-                                }`}
-                                title="Recomendación correcta"
-                              >
-                                <ThumbsUp size={15} />
-                              </button>
-                              <button
-                                onClick={() => setDislikeTarget(interest)}
-                                disabled={ratingClientId === interest.client.id}
-                                className="p-1.5 rounded-md text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
-                                title="Recomendación incorrecta"
-                              >
-                                <ThumbsDown size={15} />
-                              </button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => handleDeleteInterest(interest.id)}
-                            disabled={deletingInterestId === interest.id}
-                            className="p-1.5 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
-                            title="Eliminar"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {discarded.length > 0 && (
-                <div className="mt-4 border-t border-gray-100 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowDiscarded((v) => !v)}
-                    className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
-                  >
-                    <ChevronDown size={15} className={`transition-transform ${showDiscarded ? 'rotate-180' : ''}`} />
-                    Descartados por IA ({discarded.length})
-                  </button>
-                  {showDiscarded && (
-                    <div className="mt-2 space-y-2">
-                      {discarded.map((f) => (
-                        <div key={f.id} className="flex items-start justify-between gap-3 bg-red-50/40 border border-red-100 rounded-xl px-4 py-2.5">
-                          <div className="min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => setInfoClient({ clientId: f.client.id })}
-                              className="font-semibold text-sm text-gray-800 hover:text-pink-600 hover:underline text-left"
-                            >
-                              {f.client.firstName} {f.client.lastName}
-                            </button>
-                            <p className="text-xs text-red-700 mt-0.5">
-                              {f.reason ? FEEDBACK_REASON_LABEL[f.reason] : 'Incorrecta'}
-                              {f.comment ? ` · ${f.comment}` : ''}
-                            </p>
-                            {f.aiReason && <p className="text-xs text-gray-500 italic mt-0.5">IA: {f.aiReason}</p>}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleUndoDislike(f.clientId)}
-                            disabled={ratingClientId === f.clientId}
-                            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 disabled:opacity-40 shrink-0"
-                            title="Permitir que la IA vuelva a recomendarlo"
-                          >
-                            <Undo2 size={13} /> Deshacer
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* ── Clientes Interesados (registrados + recomendados) ─ */}
+            {id && (
+              <InterestedClientsSection
+                propertyId={id}
+                interests={interests}
+                deletingInterestId={deletingInterestId}
+                onDeleteInterest={handleDeleteInterest}
+                onRegisterInterest={() => {
+                  loadClients();
+                  setShowInterestForm(true);
+                }}
+                onInterestsChanged={refreshInterests}
+              />
+            )}
 
             {/* ── Sale Process ──────────────────────────────────────── */}
             {id && <SaleProcessCard propertyId={id} />}
@@ -1443,25 +691,6 @@ export const PropertyViewPage = () => {
           clients={clients}
           onClose={() => setShowInterestForm(false)}
           onSaved={(item) => setInterests(prev => [item, ...prev])}
-        />
-      )}
-
-      {showRecommendationsModal && (
-        <RecommendedCandidatesModal
-          candidates={recommendedCandidates}
-          saving={savingRecommendations}
-          onRemove={handleRemoveCandidate}
-          onClose={() => setShowRecommendationsModal(false)}
-          onSave={handleSaveRecommendedCandidates}
-        />
-      )}
-
-      {dislikeTarget && (
-        <DislikeModal
-          clientName={`${dislikeTarget.client.firstName} ${dislikeTarget.client.lastName}`}
-          saving={ratingClientId === dislikeTarget.client.id}
-          onClose={() => setDislikeTarget(null)}
-          onConfirm={handleConfirmDislike}
         />
       )}
 

@@ -10,6 +10,7 @@ import {
   validatePhoneNumber,
   PHONE_COUNTRY_OPTIONS,
 } from '../../../utils/phoneFormatter';
+import { ClientRecommendationsPanel } from './ClientRecommendationsPanel';
 
 export const ClientFormPage = () => {
   const { id } = useParams();
@@ -395,6 +396,8 @@ export const ClientFormPage = () => {
           </button>
         </div>
       </form>
+
+      {isEditMode && id && <ClientRecommendationsPanel clientId={id} />}
     </div>
   );
 };
