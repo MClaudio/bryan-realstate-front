@@ -11,10 +11,16 @@ import {
   ToggleRight,
   Building,
   ListChecks,
+  Sparkles,
 } from "lucide-react";
 import api, { resolveFileUrl } from "../../../services/api";
 import { Link, useNavigate } from "react-router-dom";
-import { alertConfirm, alertError, toastSuccess } from "../../../utils/alerts";
+import {
+  alertConfirm,
+  alertError,
+  toastInfo,
+  toastSuccess,
+} from "../../../utils/alerts";
 import {
   PROPERTY_STATUS_LABELS,
   PROPERTY_STATUS_COLORS,
@@ -61,6 +67,7 @@ interface Property {
 }
 
 export const PropertiesManagementPage = () => {
+  const [syncingRecommendations, setSyncingRecommendations] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -169,6 +176,30 @@ export const PropertiesManagementPage = () => {
   const propertyTypes = Object.keys(PROPERTY_TYPE_LABELS);
   const propertyStatuses = ["Validacion", "Nuevo", "Negociacion", "Vendido"];
 
+  /** Lanza en el servidor la sincronización del motor de recomendaciones (en segundo plano). */
+  const handleSyncRecommendations = async () => {
+    const confirm = await alertConfirm(
+      "Sincronizar recomendaciones",
+      "Se leerá lo que busca cada cliente (los que cambiaron) y se recalcularán los clientes recomendados de todas las propiedades. Puede tardar unos minutos; recibirás una notificación al terminar.",
+    );
+    if (!confirm.isConfirmed) return;
+    setSyncingRecommendations(true);
+    try {
+      const res = await api.post<{ started: boolean; alreadyRunning: boolean }>(
+        "/recommendations/sync",
+      );
+      if (res.data.alreadyRunning) {
+        toastInfo("Ya hay una sincronización en curso. Recibirás una notificación al terminar.");
+      } else {
+        toastSuccess("Sincronización iniciada. Recibirás una notificación al terminar.");
+      }
+    } catch {
+      alertError("Error", "No se pudo iniciar la sincronización de recomendaciones.");
+    } finally {
+      setSyncingRecommendations(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -182,12 +213,24 @@ export const PropertiesManagementPage = () => {
           </p>
         </div>
 
-        <Link
-          to="/admin/propiedades/nueva"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
-        >
-          <Plus size={20} /> Nueva Propiedad
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSyncRecommendations}
+            disabled={syncingRecommendations}
+            className="border border-blue-200 bg-white hover:bg-blue-50 text-blue-700 px-4 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 disabled:opacity-60"
+            title="Lee lo que busca cada cliente y recalcula los clientes recomendados de todas las propiedades"
+          >
+            <Sparkles size={18} />
+            {syncingRecommendations ? "Iniciando..." : "Sincronizar recomendaciones"}
+          </button>
+          <Link
+            to="/admin/propiedades/nueva"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
+          >
+            <Plus size={20} /> Nueva Propiedad
+          </Link>
+        </div>
       </div>
 
       {/* Filters and Search */}
