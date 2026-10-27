@@ -254,6 +254,9 @@ export const PropertyViewPage = () => {
   const [showInterestForm, setShowInterestForm] = useState(false);
   const [deletingInterestId, setDeletingInterestId] = useState<string | null>(null);
   const [generatingProposal, setGeneratingProposal] = useState(false);
+  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [proposalClientId, setProposalClientId] = useState<string | null>(null);
+  const [proposalClientSearch, setProposalClientSearch] = useState('');
 
   const extractCoordsFromUrl = (url: string): { lat: number; lng: number } | null => {
     // For place URLs, use the LAST !3d!4d pair (actual place pin, not viewport or nearby results)
@@ -385,13 +388,17 @@ export const PropertyViewPage = () => {
   };
 
   /** Genera en el backend la propuesta de valor (PDF) y la abre en otra pestaña para imprimir/descargar. */
-  const handleGenerateProposal = async () => {
+  const handleGenerateProposal = async (clientId?: string) => {
     if (!id) return;
     // Open the tab synchronously (inside the click) so popup blockers allow it.
     const tab = window.open('', '_blank');
+    setShowProposalModal(false);
     setGeneratingProposal(true);
     try {
-      const res = await api.get(`/properties/${id}/proposal-pdf`, { responseType: 'blob' });
+      const res = await api.get(`/properties/${id}/proposal-pdf`, {
+        responseType: 'blob',
+        params: clientId ? { clientId } : undefined,
+      });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       if (tab && !tab.closed) {
         tab.location.href = url;
@@ -413,8 +420,71 @@ export const PropertyViewPage = () => {
   if (loading) return <div className="p-8">Cargando...</div>;
   if (!property) return <div className="p-8">Propiedad no encontrada</div>;
 
+  const proposalClientTerm = proposalClientSearch.trim().toLowerCase();
+  const proposalClients = clients.filter(c =>
+    `${c.firstName} ${c.lastName}`.toLowerCase().includes(proposalClientTerm),
+  );
+
   return (
     <div className="p-6">
+      {showProposalModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowProposalModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-md p-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-gray-800">Dedicar propuesta</h2>
+            <p className="text-sm text-gray-500 mb-3">
+              Selecciona el cliente al que va dirigida (solo se mostrará su nombre).
+            </p>
+            <input
+              type="text"
+              value={proposalClientSearch}
+              onChange={e => setProposalClientSearch(e.target.value)}
+              placeholder="Buscar cliente..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2"
+              autoFocus
+            />
+            <ul className="max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+              <li
+                onClick={() => setProposalClientId(null)}
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 ${proposalClientId === null ? 'bg-slate-100 font-medium' : 'text-gray-500'}`}
+              >
+                Sin dedicatoria
+              </li>
+              {proposalClients.map(c => (
+                <li
+                  key={c.id}
+                  onClick={() => setProposalClientId(c.id)}
+                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 ${proposalClientId === c.id ? 'bg-slate-100 font-medium' : ''}`}
+                >
+                  {c.firstName} {c.lastName}
+                </li>
+              ))}
+              {proposalClients.length === 0 && (
+                <li className="px-3 py-2 text-sm text-gray-400">No se encontraron clientes</li>
+              )}
+            </ul>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setShowProposalModal(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleGenerateProposal(proposalClientId ?? undefined)}
+                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium"
+              >
+                Generar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
           <Link to="/admin/propiedades/gestion" className="p-2 hover:bg-gray-100 rounded-full">
@@ -424,7 +494,12 @@ export const PropertyViewPage = () => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleGenerateProposal}
+            onClick={() => {
+              setProposalClientId(null);
+              setProposalClientSearch('');
+              setShowProposalModal(true);
+              loadClients();
+            }}
             disabled={generatingProposal}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium transition-colors disabled:opacity-60"
             title="Generar propuesta de valor en PDF para el cliente"
