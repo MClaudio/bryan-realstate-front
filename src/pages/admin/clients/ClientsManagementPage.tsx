@@ -67,6 +67,8 @@ interface GoogleStatus {
   lastError: string | null;
 }
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 70, 100, 500, 1000];
+
 export const ClientsManagementPage = () => {
   const { can } = useAuth();
   // Sincronizar contactos (Google) crea clientes: ligado al permiso de crear.
@@ -87,9 +89,28 @@ export const ClientsManagementPage = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [page, setPage] = useState(1);
+
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Espera a que el usuario deje de escribir antes de consultar al servidor.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   useEffect(() => {
     fetchClients();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, debouncedSearch]);
+
+  useEffect(() => {
     if (canSync) fetchGoogleStatus();
   }, [canSync]);
 
@@ -104,8 +125,18 @@ export const ClientsManagementPage = () => {
 
   const fetchClients = async () => {
     try {
-      const response = await api.get('/clients');
-      setClients(response.data);
+      const response = await api.get<{
+        data: Client[];
+        total: number;
+        page: number;
+        totalPages: number;
+      }>('/clients', {
+        params: { page, limit: pageSize, search: debouncedSearch || undefined },
+      });
+      setClients(response.data.data);
+      setTotal(response.data.total);
+      setTotalPages(response.data.totalPages);
+      if (response.data.page !== page) setPage(response.data.page);
     } catch (error) {
       console.error('Error fetching clients:', error);
     } finally {
@@ -127,16 +158,8 @@ export const ClientsManagementPage = () => {
     }
   };
 
-  const filteredClients = clients.filter(client => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return true;
-    const fullName = `${client.firstName} ${client.lastName}`.toLowerCase();
-    return (
-      fullName.includes(term) ||
-      (client.email && client.email.toLowerCase().includes(term)) ||
-      client.phone.includes(term)
-    );
-  });
+  const currentPage = page;
+  const startIndex = (currentPage - 1) * pageSize;
 
   const openSyncModal = async () => {
     setSyncModalOpen(true);
@@ -326,12 +349,12 @@ export const ClientsManagementPage = () => {
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-gray-500">Cargando...</td>
                 </tr>
-              ) : filteredClients.length === 0 ? (
+              ) : clients.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-gray-500">No se encontraron clientes</td>
                 </tr>
               ) : (
-                filteredClients.map((client) => (
+                clients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50">
                     <td className="p-4 font-medium flex items-center gap-2">
                       <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
@@ -404,6 +427,45 @@ export const ClientsManagementPage = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="p-4 border-t flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+          <div className="flex items-center gap-2">
+            <label htmlFor="clients-page-size">Mostrar</label>
+            <select
+              id="clients-page-size"
+              className="border rounded-md p-1.5"
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+            <span>
+              {total === 0
+                ? '0 registros'
+                : `${startIndex + 1}-${Math.min(startIndex + pageSize, total)} de ${total}`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="px-3 py-1.5 border rounded-md hover:bg-gray-50 disabled:opacity-50"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              Anterior
+            </button>
+            <span>Página {currentPage} de {totalPages}</span>
+            <button
+              className="px-3 py-1.5 border rounded-md hover:bg-gray-50 disabled:opacity-50"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Siguiente
+            </button>
+          </div>
         </div>
       </div>
 
