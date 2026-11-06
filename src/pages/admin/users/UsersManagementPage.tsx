@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, Search, User, Shield, Briefcase } from 'lucide-reac
 import api from '../../../services/api';
 import { Link } from 'react-router-dom';
 import { alertConfirm, alertError, toastSuccess } from '../../../utils/alerts';
+import { Can } from '../../../components/common/Can';
 
 interface User {
   id: string;
@@ -14,6 +15,7 @@ interface User {
   phone: string;
   ruc: string;
   isActive: boolean;
+  profile?: { id: string; name: string } | null;
 }
 
 export const UsersManagementPage = () => {
@@ -70,12 +72,14 @@ export const UsersManagementPage = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Gestión de Usuarios</h1>
-        <Link 
-          to="/admin/usuarios/nuevo" 
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus size={20} /> Nuevo Usuario
-        </Link>
+        <Can module="users" action="create">
+          <Link 
+            to="/admin/usuarios/nuevo" 
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          >
+            <Plus size={20} /> Nuevo Usuario
+          </Link>
+        </Can>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -101,6 +105,7 @@ export const UsersManagementPage = () => {
                 <th className="p-4 font-semibold text-gray-600">Usuario</th>
                 <th className="p-4 font-semibold text-gray-600">Nombre Completo</th>
                 <th className="p-4 font-semibold text-gray-600">Email</th>
+                <th className="p-4 font-semibold text-gray-600">Perfil</th>
                 <th className="p-4 font-semibold text-gray-600">Rol</th>
                 <th className="p-4 font-semibold text-gray-600">Estado</th>
                 <th className="p-4 font-semibold text-gray-600">Teléfono</th>
@@ -110,11 +115,11 @@ export const UsersManagementPage = () => {
             <tbody className="divide-y">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-500">Cargando...</td>
+                  <td colSpan={8} className="p-8 text-center text-gray-500">Cargando...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-500">No se encontraron usuarios</td>
+                  <td colSpan={8} className="p-8 text-center text-gray-500">No se encontraron usuarios</td>
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
@@ -127,6 +132,7 @@ export const UsersManagementPage = () => {
                     </td>
                     <td className="p-4">{user.firstName} {user.lastName}</td>
                     <td className="p-4 text-gray-600">{user.email}</td>
+                    <td className="p-4 text-gray-700">{user.profile?.name ?? <span className="text-gray-400">Sin perfil</span>}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 w-fit ${getTypeColor(user.type)}`}>
                         {user.type === 'ADMIN' && <Shield size={12} />}
@@ -143,18 +149,22 @@ export const UsersManagementPage = () => {
                     </td>
                     <td className="p-4 text-gray-600">{user.phone || '-'}</td>
                     <td className="p-4 text-right space-x-2">
-                      <Link to={`/admin/usuarios/editar/${user.id}`} className="text-blue-500 hover:text-blue-700 inline-block" title="Editar">
-                        <Edit size={18} />
-                      </Link>
-                      {user.isActive && (
-                        <button 
-                          className="text-red-500 hover:text-red-700" 
-                          title="Desactivar"
-                          onClick={() => handleDelete(user.id)}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
+                      <Can module="users" action="edit">
+                        <Link to={`/admin/usuarios/editar/${user.id}`} className="text-blue-500 hover:text-blue-700 inline-block" title="Editar">
+                          <Edit size={18} />
+                        </Link>
+                      </Can>
+                      <Can module="users" action="delete">
+                        {user.isActive && (
+                          <button 
+                            className="text-red-500 hover:text-red-700" 
+                            title="Desactivar"
+                            onClick={() => handleDelete(user.id)}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </Can>
                     </td>
                   </tr>
                 ))

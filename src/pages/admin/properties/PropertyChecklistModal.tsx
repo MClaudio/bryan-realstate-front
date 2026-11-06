@@ -3,6 +3,7 @@ import { ListChecks, Printer, X, Loader2 } from "lucide-react";
 import { isAxiosError } from "axios";
 import api from "../../../services/api";
 import { alertError } from "../../../utils/alerts";
+import { Can } from '../../../components/common/Can';
 import {
   CHECKLIST_SIDES,
   type ChecklistSide,
@@ -225,14 +226,16 @@ export const PropertyChecklistModal = ({ property, onClose }: Props) => {
           >
             Cerrar
           </button>
-          <button
-            onClick={() => window.print()}
-            disabled={!checklist || saving.size > 0}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white transition-colors"
-          >
-            <Printer size={16} />
-            Imprimir
-          </button>
+          <Can module="properties" action="print">
+            <button
+              onClick={() => window.print()}
+              disabled={!checklist || saving.size > 0}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white transition-colors"
+            >
+              <Printer size={16} />
+              Imprimir
+            </button>
+          </Can>
         </div>
       </div>
 

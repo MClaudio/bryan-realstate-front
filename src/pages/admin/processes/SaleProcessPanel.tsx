@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { Check, ExternalLink, Loader2 } from "lucide-react";
 import api from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
 import { alertError, toastSuccess } from "../../../utils/alerts";
 import {
   PAYMENT_METHOD_LABELS,
@@ -136,6 +137,8 @@ const StageCard = ({
     stage.registryStatus ?? "",
   );
   const [saving, setSaving] = useState(false);
+  const { can } = useAuth();
+  const readOnly = !can("processes", "edit");
 
   const total = toNumber(totalValue);
   const deposit = toNumber(depositAmount);
@@ -149,6 +152,7 @@ const StageCard = ({
     (stage.stage === "Registro" && (registryStatus || null) !== stage.registryStatus);
 
   const patch = async (body: Record<string, unknown>, successMsg: string) => {
+    if (readOnly) return;
     setSaving(true);
     try {
       const res = await api.patch(
@@ -183,7 +187,9 @@ const StageCard = ({
         : "border border-gray-200";
 
   return (
-    <section className={`bg-white rounded-xl p-5 space-y-4 ${border}`}>
+    <section className={`bg-white rounded-xl p-5 ${border}`}>
+      {/* Sin permiso de editar, todos los campos del paso quedan deshabilitados. */}
+      <fieldset disabled={readOnly} className="min-w-0 space-y-4 border-0 p-0 m-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-base font-bold text-gray-900">
           {index}. {stage.label}
@@ -300,6 +306,7 @@ const StageCard = ({
         )}
         <div className="flex items-center gap-3">
           {dirty && <span className="text-xs text-amber-700">Cambios sin guardar</span>}
+          {!readOnly && (
           <button
             onClick={save}
             disabled={saving || !dirty || depositTooHigh}
@@ -308,8 +315,10 @@ const StageCard = ({
             {saving && <Loader2 size={14} className="animate-spin" />}
             {isManualStage(stage.stage) ? "Guardar observación" : "Guardar"}
           </button>
+          )}
         </div>
       </div>
+      </fieldset>
     </section>
   );
 };
@@ -373,10 +382,12 @@ interface PanelProps {
 
 export const SaleProcessPanel = ({ process, onChange }: PanelProps) => {
   const [changingMethod, setChangingMethod] = useState(false);
+  const { can } = useAuth();
+  const readOnly = !can("processes", "edit");
   const applicable = process.stages.filter((s) => s.applies);
 
   const setMethod = async (paymentMethod: PaymentMethod) => {
-    if (paymentMethod === process.paymentMethod) return;
+    if (readOnly || paymentMethod === process.paymentMethod) return;
     setChangingMethod(true);
     try {
       const res = await api.patch(`/sale-processes/${process.propertyId}`, {
@@ -408,7 +419,7 @@ export const SaleProcessPanel = ({ process, onChange }: PanelProps) => {
                   key={m}
                   role="radio"
                   aria-checked={active}
-                  disabled={changingMethod}
+                  disabled={changingMethod || readOnly}
                   onClick={() => setMethod(m)}
                   className={`px-4 py-1.5 rounded-md text-sm transition-colors ${
                     active

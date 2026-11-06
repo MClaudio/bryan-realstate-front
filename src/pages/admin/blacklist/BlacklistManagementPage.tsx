@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, Search, ShieldX, Phone } from 'lucide-react';
 import api from '../../../services/api';
 import { Link } from 'react-router-dom';
 import { alertConfirm, alertError, toastSuccess } from '../../../utils/alerts';
+import { Can } from '../../../components/common/Can';
 
 interface BlacklistEntry {
   id: string;
@@ -58,12 +59,14 @@ export const BlacklistManagementPage = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Lista Negra</h1>
-        <Link
-          to="/admin/lista-negra/nuevo"
-          className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
-        >
-          <Plus size={20} /> Agregar Registro
-        </Link>
+        <Can module="blacklist" action="create">
+          <Link
+            to="/admin/lista-negra/nuevo"
+            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
+          >
+            <Plus size={20} /> Agregar Registro
+          </Link>
+        </Can>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -123,20 +126,24 @@ export const BlacklistManagementPage = () => {
                       {new Date(entry.createdAt).toLocaleDateString()}
                     </td>
                     <td className="p-4 text-right space-x-2">
-                      <Link
-                        to={`/admin/lista-negra/editar/${entry.id}`}
-                        className="text-blue-500 hover:text-blue-700 inline-block"
-                        title="Editar"
-                      >
-                        <Edit size={18} />
-                      </Link>
-                      <button
-                        className="text-red-500 hover:text-red-700"
-                        title="Eliminar"
-                        onClick={() => handleDelete(entry.id)}
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <Can module="blacklist" action="edit">
+                        <Link
+                          to={`/admin/lista-negra/editar/${entry.id}`}
+                          className="text-blue-500 hover:text-blue-700 inline-block"
+                          title="Editar"
+                        >
+                          <Edit size={18} />
+                        </Link>
+                      </Can>
+                      <Can module="blacklist" action="delete">
+                        <button
+                          className="text-red-500 hover:text-red-700"
+                          title="Eliminar"
+                          onClick={() => handleDelete(entry.id)}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </Can>
                     </td>
                   </tr>
                 ))

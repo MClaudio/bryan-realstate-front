@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import api from '../../services/api';
+import { ClientRecommendationsPanel } from '../../pages/admin/clients/ClientRecommendationsPanel';
 
 interface ClientInfo {
   id: string;
@@ -104,7 +105,7 @@ export const ClientInfoModal = ({ clientId, onClose, interest }: Props) => {
       aria-label="Información del cliente"
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100">
@@ -228,6 +229,8 @@ export const ClientInfoModal = ({ clientId, onClose, interest }: Props) => {
                   </InfoRow>
                 )}
               </div>
+
+              <ClientRecommendationsPanel clientId={client.id} embedded />
             </>
           )}
         </div>

@@ -24,7 +24,11 @@ export const SaleProcessEditPage = () => {
       })
       .catch((err) => {
         if (!cancelled)
-          setError(err.response?.data?.message || "No se pudo cargar el proceso");
+          setError(
+            err.response?.status === 403
+              ? "No tienes acceso a ver el proceso"
+              : err.response?.data?.message || "No se pudo cargar el proceso",
+          );
       });
     return () => {
       cancelled = true;

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import {
+  Lock,
   Users,
   Building2,
   UserCheck,
@@ -105,7 +106,7 @@ const MODAL_TITLES: Record<DashboardModalType, string> = {
   statusProperties: "Propiedades por Estado",
 };
 
-export const DashboardPage = () => {
+const DashboardContent = () => {
   const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
     null,
@@ -716,4 +717,38 @@ export const DashboardPage = () => {
       </div>
     </div>
   );
+};
+
+/**
+ * Sin acceso al dashboard la página sigue visible en el menú pero bloqueada:
+ * no se monta el contenido, por lo que tampoco se piden datos a /dashboard/*.
+ */
+export const DashboardPage = () => {
+  const { canAccess } = useAuth();
+
+  if (!canAccess("dashboard")) {
+    return (
+      <div className="relative">
+        <div aria-hidden className="pointer-events-none select-none blur-sm opacity-60">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-xl shadow-sm h-32" />
+            ))}
+          </div>
+          <div className="bg-white rounded-xl shadow-sm h-72" />
+        </div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+          <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4 shadow">
+            <Lock className="w-10 h-10 text-gray-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-1">Dashboard bloqueado</h2>
+          <p className="text-gray-600 max-w-sm">
+            Tu perfil no tiene acceso a la información del dashboard. Contacta al administrador si lo necesitas.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return <DashboardContent />;
 };

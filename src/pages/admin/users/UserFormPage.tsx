@@ -5,6 +5,7 @@ import api from '../../../services/api';
 import { Save, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { alertError, toastSuccess } from '../../../utils/alerts';
 import { useAuth } from '../../../context/AuthContext';
+import type { Profile } from '../../../types/permissions';
 
 export const UserFormPage = () => {
   const { id } = useParams();
@@ -15,6 +16,7 @@ export const UserFormPage = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: {
@@ -26,9 +28,14 @@ export const UserFormPage = () => {
       phone: '',
       address: '',
       ruc: '',
-      type: 'EMPLOYEE'
+      type: 'EMPLOYEE',
+      profileId: ''
     }
   });
+
+  useEffect(() => {
+    api.get('/profiles').then((res) => setProfiles(res.data)).catch((err) => console.error('Error fetching profiles:', err));
+  }, []);
 
   useEffect(() => {
     if (isEditMode) {
@@ -47,6 +54,7 @@ export const UserFormPage = () => {
             address: userData.address ?? '',
             ruc: userData.ruc ?? '',
             type: userData.type ?? 'EMPLOYEE',
+            profileId: userData.profileId ?? '',
           };
           reset(allowed);
           setIsActive(userData.isActive ?? true);
@@ -70,6 +78,7 @@ export const UserFormPage = () => {
         ruc: data.ruc,
         type: data.type,
       };
+      if (data.profileId) payload.profileId = data.profileId;
       if (data.phone && data.phone.trim().length > 0) {
         payload.phone = data.phone.trim();
       }
@@ -192,12 +201,23 @@ export const UserFormPage = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Rol *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Rol * <span className="text-gray-400 font-normal">(funciones internas de cada módulo)</span></label>
             <select {...register('type')} className="w-full p-2 border rounded-md">
               <option value="EMPLOYEE">Empleado</option>
               <option value="ACCOUNTING">Contabilidad</option>
               <option value="ADMIN">Administrador</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Perfil (acceso a módulos)</label>
+            <select {...register('profileId')} className="w-full p-2 border rounded-md">
+              <option value="">{isEditMode ? 'Sin perfil' : 'Perfil ADMIN (por defecto)'}</option>
+              {profiles.filter((p) => p.isActive).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Define qué módulos y acciones puede usar.</p>
           </div>
 
           {isEditMode && (

@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Search, User, Phone, Mail, Calendar, RefreshCcw, X, ContactRound, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, Search, User, Phone, Mail, Calendar, RefreshCcw, X, ContactRound, CheckCircle2, AlertTriangle } from 'lucide-react';
 import api from '../../../services/api';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { alertConfirm, alertError, toastSuccess } from '../../../utils/alerts';
+import { Can } from '../../../components/common/Can';
+import { ClientInfoModal } from '../../../components/clients/ClientInfoModal';
+import { useAuth } from '../../../context/AuthContext';
 import { formatPhoneNumber } from '../../../utils/phoneFormatter';
 
 interface Client {
@@ -64,10 +67,16 @@ interface GoogleStatus {
   lastError: string | null;
 }
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 70, 100, 500, 1000];
+
 export const ClientsManagementPage = () => {
+  const { can } = useAuth();
+  // Sincronizar contactos (Google) crea clientes: ligado al permiso de crear.
+  const canSync = can('clients', 'create');
   const location = useLocation();
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
+  const [viewClientId, setViewClientId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [syncModalOpen, setSyncModalOpen] = useState(false);
@@ -80,11 +89,30 @@ export const ClientsManagementPage = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [page, setPage] = useState(1);
+
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Espera a que el usuario deje de escribir antes de consultar al servidor.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   useEffect(() => {
     fetchClients();
-    fetchGoogleStatus();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, debouncedSearch]);
+
+  useEffect(() => {
+    if (canSync) fetchGoogleStatus();
+  }, [canSync]);
 
   const fetchGoogleStatus = async () => {
     try {
@@ -97,8 +125,18 @@ export const ClientsManagementPage = () => {
 
   const fetchClients = async () => {
     try {
-      const response = await api.get('/clients');
-      setClients(response.data);
+      const response = await api.get<{
+        data: Client[];
+        total: number;
+        page: number;
+        totalPages: number;
+      }>('/clients', {
+        params: { page, limit: pageSize, search: debouncedSearch || undefined },
+      });
+      setClients(response.data.data);
+      setTotal(response.data.total);
+      setTotalPages(response.data.totalPages);
+      if (response.data.page !== page) setPage(response.data.page);
     } catch (error) {
       console.error('Error fetching clients:', error);
     } finally {
@@ -120,12 +158,8 @@ export const ClientsManagementPage = () => {
     }
   };
 
-  const filteredClients = clients.filter(client => 
-    client.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    client.phone.includes(searchTerm)
-  );
+  const currentPage = page;
+  const startIndex = (currentPage - 1) * pageSize;
 
   const openSyncModal = async () => {
     setSyncModalOpen(true);
@@ -244,36 +278,42 @@ export const ClientsManagementPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Gestión de Clientes</h1>
         <div className="flex items-center gap-3">
-          {googleStatus && (
-            googleStatus.connected ? (
-              <span
-                className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg"
-                title={googleStatus.lastRefreshAt ? `Última renovación: ${new Date(googleStatus.lastRefreshAt).toLocaleString()}` : undefined}
-              >
-                <CheckCircle2 size={14} /> Google conectado
-              </span>
-            ) : (
-              <button
-                onClick={openGoogleAuthModal}
-                className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg hover:bg-amber-100"
-                title={googleStatus.lastError ?? 'Es necesario reconectar la cuenta de Google'}
-              >
-                <AlertTriangle size={14} /> Reconexión requerida
-              </button>
-            )
+          {canSync && (
+            <>
+            {googleStatus && (
+              googleStatus.connected ? (
+                <span
+                  className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg"
+                  title={googleStatus.lastRefreshAt ? `Última renovación: ${new Date(googleStatus.lastRefreshAt).toLocaleString()}` : undefined}
+                >
+                  <CheckCircle2 size={14} /> Google conectado
+                </span>
+              ) : (
+                <button
+                  onClick={openGoogleAuthModal}
+                  className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg hover:bg-amber-100"
+                  title={googleStatus.lastError ?? 'Es necesario reconectar la cuenta de Google'}
+                >
+                  <AlertTriangle size={14} /> Reconexión requerida
+                </button>
+              )
+            )}
+            <button
+              onClick={openSyncModal}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2"
+            >
+              <RefreshCcw size={18} /> Sincronizar contactos
+            </button>
+            </>
           )}
-          <button
-            onClick={openSyncModal}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2"
-          >
-            <RefreshCcw size={18} /> Sincronizar contactos
-          </button>
-          <Link 
-            to="/admin/clientes/nuevo" 
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Plus size={20} /> Nuevo Cliente
-          </Link>
+          <Can module="clients" action="create">
+            <Link
+              to="/admin/clientes/nuevo"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Plus size={20} /> Nuevo Cliente
+            </Link>
+          </Can>
         </div>
       </div>
 
@@ -309,12 +349,12 @@ export const ClientsManagementPage = () => {
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-gray-500">Cargando...</td>
                 </tr>
-              ) : filteredClients.length === 0 ? (
+              ) : clients.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-gray-500">No se encontraron clientes</td>
                 </tr>
               ) : (
-                filteredClients.map((client) => (
+                clients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50">
                     <td className="p-4 font-medium flex items-center gap-2">
                       <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
@@ -357,22 +397,75 @@ export const ClientsManagementPage = () => {
                       </span>
                     </td>
                     <td className="p-4 text-right space-x-2">
-                      <Link to={`/admin/clientes/editar/${client.id}`} className="text-blue-500 hover:text-blue-700 inline-block" title="Editar">
-                        <Edit size={18} />
-                      </Link>
-                      <button 
-                        className="text-red-500 hover:text-red-700" 
-                        title="Eliminar"
-                        onClick={() => handleDelete(client.id)}
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <Can module="clients" action="view">
+                        <button
+                          type="button"
+                          className="text-gray-500 hover:text-blue-600 inline-block align-middle"
+                          title="Ver ficha del cliente"
+                          onClick={() => setViewClientId(client.id)}
+                        >
+                          <Eye size={18} />
+                        </button>
+                      </Can>
+                      <Can module="clients" action="edit">
+                        <Link to={`/admin/clientes/editar/${client.id}`} className="text-blue-500 hover:text-blue-700 inline-block" title="Editar">
+                          <Edit size={18} />
+                        </Link>
+                      </Can>
+                      <Can module="clients" action="delete">
+                        <button
+                          className="text-red-500 hover:text-red-700"
+                          title="Eliminar"
+                          onClick={() => handleDelete(client.id)}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </Can>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="p-4 border-t flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+          <div className="flex items-center gap-2">
+            <label htmlFor="clients-page-size">Mostrar</label>
+            <select
+              id="clients-page-size"
+              className="border rounded-md p-1.5"
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+            <span>
+              {total === 0
+                ? '0 registros'
+                : `${startIndex + 1}-${Math.min(startIndex + pageSize, total)} de ${total}`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="px-3 py-1.5 border rounded-md hover:bg-gray-50 disabled:opacity-50"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              Anterior
+            </button>
+            <span>Página {currentPage} de {totalPages}</span>
+            <button
+              className="px-3 py-1.5 border rounded-md hover:bg-gray-50 disabled:opacity-50"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Siguiente
+            </button>
+          </div>
         </div>
       </div>
 
@@ -572,6 +665,10 @@ export const ClientsManagementPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {viewClientId && (
+        <ClientInfoModal clientId={viewClientId} onClose={() => setViewClientId(null)} />
       )}
     </div>
   );
