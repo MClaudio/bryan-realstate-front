@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bot, CheckCircle2, CircleHelp, RefreshCw, Sparkles } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
 import api from '../../../services/api';
 import { toastError, toastSuccess } from '../../../utils/alerts';
 
@@ -65,7 +66,8 @@ const splitExplanation = (explanation: string) => {
 };
 
 /** Cómo se entendió el interés del cliente y qué propiedades se le recomiendan. */
-export const ClientRecommendationsPanel = ({ clientId }: { clientId: string }) => {
+export const ClientRecommendationsPanel = ({ clientId, embedded = false }: { clientId: string; embedded?: boolean }) => {
+  const { can } = useAuth();
   const [criteria, setCriteria] = useState<ClientCriteria | null>(null);
   const [matches, setMatches] = useState<ClientMatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,11 +152,12 @@ export const ClientRecommendationsPanel = ({ clientId }: { clientId: string }) =
     : [];
 
   return (
-    <div className="mt-6 bg-white p-6 rounded-xl shadow-sm">
+    <div className={embedded ? 'border-t border-gray-100 pt-4' : 'mt-6 bg-white p-6 rounded-xl shadow-sm'}>
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
           <Sparkles size={18} className="text-blue-500" /> Lo que busca y propiedades recomendadas
         </h2>
+        {can('clients', 'edit') && (
         <button
           type="button"
           onClick={handleRefresh}
@@ -164,6 +167,7 @@ export const ClientRecommendationsPanel = ({ clientId }: { clientId: string }) =
           <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
           {refreshing ? 'Actualizando...' : 'Volver a leer interés'}
         </button>
+        )}
       </div>
 
       {loading ? (

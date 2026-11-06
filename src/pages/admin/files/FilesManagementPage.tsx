@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api, { resolveFileUrl } from '../../../services/api';
 import { Trash2, FileText, Download, Search, X } from 'lucide-react';
 import { alertConfirm, alertError, toastSuccess } from '../../../utils/alerts';
+import { Can } from '../../../components/common/Can';
 
 interface File {
   id: string;
@@ -157,6 +158,7 @@ export const FilesManagementPage = () => {
                 )}
                 
                 <div className="absolute inset-0 bg-black/50 opacity-0 md:group-hover:opacity-100 transition hidden md:flex items-center justify-center gap-5 pointer-events-none">
+                  <Can module="files" action="download">
                   <a
                     href={resolveFileUrl(file)}
                     target="_blank"
@@ -169,6 +171,8 @@ export const FilesManagementPage = () => {
                   >
                     <Download size={22} strokeWidth={2.25} className="block" />
                   </a>
+                  </Can>
+                  <Can module="files" action="delete">
                   <button
                     type="button"
                     onClick={() => handleDelete(file.id)}
@@ -180,6 +184,7 @@ export const FilesManagementPage = () => {
                   >
                     <Trash2 size={22} strokeWidth={2.25} className="block" />
                   </button>
+                  </Can>
                 </div>
               </div>
               
@@ -197,6 +202,7 @@ export const FilesManagementPage = () => {
                   </p>
                 )}
                 <div className="mt-3 grid grid-cols-2 gap-2 md:hidden">
+                  <Can module="files" action="download">
                   <a
                     href={resolveFileUrl(file)}
                     target="_blank"
@@ -206,6 +212,8 @@ export const FilesManagementPage = () => {
                     <Download size={16} />
                     Descargar
                   </a>
+                  </Can>
+                  <Can module="files" action="delete">
                   <button
                     type="button"
                     onClick={() => handleDelete(file.id)}
@@ -214,6 +222,7 @@ export const FilesManagementPage = () => {
                     <Trash2 size={16} />
                     Eliminar
                   </button>
+                  </Can>
                 </div>
               </div>
             </div>

@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Search, User, Phone, Mail, Calendar, RefreshCcw, X, ContactRound, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, Search, User, Phone, Mail, Calendar, RefreshCcw, X, ContactRound, CheckCircle2, AlertTriangle } from 'lucide-react';
 import api from '../../../services/api';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { alertConfirm, alertError, toastSuccess } from '../../../utils/alerts';
+import { Can } from '../../../components/common/Can';
+import { ClientInfoModal } from '../../../components/clients/ClientInfoModal';
+import { useAuth } from '../../../context/AuthContext';
 import { formatPhoneNumber } from '../../../utils/phoneFormatter';
 
 interface Client {
@@ -65,9 +68,13 @@ interface GoogleStatus {
 }
 
 export const ClientsManagementPage = () => {
+  const { can } = useAuth();
+  // Sincronizar contactos (Google) crea clientes: ligado al permiso de crear.
+  const canSync = can('clients', 'create');
   const location = useLocation();
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
+  const [viewClientId, setViewClientId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [syncModalOpen, setSyncModalOpen] = useState(false);
@@ -83,8 +90,8 @@ export const ClientsManagementPage = () => {
 
   useEffect(() => {
     fetchClients();
-    fetchGoogleStatus();
-  }, []);
+    if (canSync) fetchGoogleStatus();
+  }, [canSync]);
 
   const fetchGoogleStatus = async () => {
     try {
@@ -120,12 +127,16 @@ export const ClientsManagementPage = () => {
     }
   };
 
-  const filteredClients = clients.filter(client => 
-    client.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    client.phone.includes(searchTerm)
-  );
+  const filteredClients = clients.filter(client => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return true;
+    const fullName = `${client.firstName} ${client.lastName}`.toLowerCase();
+    return (
+      fullName.includes(term) ||
+      (client.email && client.email.toLowerCase().includes(term)) ||
+      client.phone.includes(term)
+    );
+  });
 
   const openSyncModal = async () => {
     setSyncModalOpen(true);
@@ -244,36 +255,42 @@ export const ClientsManagementPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Gestión de Clientes</h1>
         <div className="flex items-center gap-3">
-          {googleStatus && (
-            googleStatus.connected ? (
-              <span
-                className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg"
-                title={googleStatus.lastRefreshAt ? `Última renovación: ${new Date(googleStatus.lastRefreshAt).toLocaleString()}` : undefined}
-              >
-                <CheckCircle2 size={14} /> Google conectado
-              </span>
-            ) : (
-              <button
-                onClick={openGoogleAuthModal}
-                className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg hover:bg-amber-100"
-                title={googleStatus.lastError ?? 'Es necesario reconectar la cuenta de Google'}
-              >
-                <AlertTriangle size={14} /> Reconexión requerida
-              </button>
-            )
+          {canSync && (
+            <>
+            {googleStatus && (
+              googleStatus.connected ? (
+                <span
+                  className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg"
+                  title={googleStatus.lastRefreshAt ? `Última renovación: ${new Date(googleStatus.lastRefreshAt).toLocaleString()}` : undefined}
+                >
+                  <CheckCircle2 size={14} /> Google conectado
+                </span>
+              ) : (
+                <button
+                  onClick={openGoogleAuthModal}
+                  className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg hover:bg-amber-100"
+                  title={googleStatus.lastError ?? 'Es necesario reconectar la cuenta de Google'}
+                >
+                  <AlertTriangle size={14} /> Reconexión requerida
+                </button>
+              )
+            )}
+            <button
+              onClick={openSyncModal}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2"
+            >
+              <RefreshCcw size={18} /> Sincronizar contactos
+            </button>
+            </>
           )}
-          <button
-            onClick={openSyncModal}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2"
-          >
-            <RefreshCcw size={18} /> Sincronizar contactos
-          </button>
-          <Link 
-            to="/admin/clientes/nuevo" 
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Plus size={20} /> Nuevo Cliente
-          </Link>
+          <Can module="clients" action="create">
+            <Link
+              to="/admin/clientes/nuevo"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Plus size={20} /> Nuevo Cliente
+            </Link>
+          </Can>
         </div>
       </div>
 
@@ -357,16 +374,30 @@ export const ClientsManagementPage = () => {
                       </span>
                     </td>
                     <td className="p-4 text-right space-x-2">
-                      <Link to={`/admin/clientes/editar/${client.id}`} className="text-blue-500 hover:text-blue-700 inline-block" title="Editar">
-                        <Edit size={18} />
-                      </Link>
-                      <button 
-                        className="text-red-500 hover:text-red-700" 
-                        title="Eliminar"
-                        onClick={() => handleDelete(client.id)}
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <Can module="clients" action="view">
+                        <button
+                          type="button"
+                          className="text-gray-500 hover:text-blue-600 inline-block align-middle"
+                          title="Ver ficha del cliente"
+                          onClick={() => setViewClientId(client.id)}
+                        >
+                          <Eye size={18} />
+                        </button>
+                      </Can>
+                      <Can module="clients" action="edit">
+                        <Link to={`/admin/clientes/editar/${client.id}`} className="text-blue-500 hover:text-blue-700 inline-block" title="Editar">
+                          <Edit size={18} />
+                        </Link>
+                      </Can>
+                      <Can module="clients" action="delete">
+                        <button
+                          className="text-red-500 hover:text-red-700"
+                          title="Eliminar"
+                          onClick={() => handleDelete(client.id)}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </Can>
                     </td>
                   </tr>
                 ))
@@ -572,6 +603,10 @@ export const ClientsManagementPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {viewClientId && (
+        <ClientInfoModal clientId={viewClientId} onClose={() => setViewClientId(null)} />
       )}
     </div>
   );

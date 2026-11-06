@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import api from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Save,
@@ -83,6 +84,7 @@ const buildPropertyCode = ({
 
 export const PropertyFormPage = () => {
   const { id } = useParams();
+  const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [generatingDescriptions, setGeneratingDescriptions] = useState(false);
@@ -286,11 +288,11 @@ export const PropertyFormPage = () => {
 
   const fetchAdvisors = useCallback(async () => {
     try {
-      const response = await api.get("/users");
+      // Endpoint abierto a cualquier sesión: no requiere acceso al módulo Usuarios.
+      const response = await api.get("/users/advisors");
       setAdvisors(response.data);
     } catch (error) {
       console.error("Error fetching advisors:", error);
-      // Non-critical error, continue without advisors
     }
   }, []);
 
@@ -353,12 +355,20 @@ export const PropertyFormPage = () => {
     [],
   );
 
-  // Fetch advisors only once on mount
+  // Fetch advisors, clients and cities only once on mount
   useEffect(() => {
     fetchAdvisors();
     fetchClients();
     fetchCities();
   }, [fetchAdvisors, fetchClients, fetchCities]);
+
+  // El asesor por defecto es el usuario logueado (al crear y al editar); se puede cambiar.
+  // Se reaplica al cargar la lista para que el <select> ya tenga la opción disponible.
+  useEffect(() => {
+    if (currentUser?.id) {
+      setValue("advisorId", currentUser.id, { shouldValidate: true });
+    }
+  }, [currentUser?.id, advisors.length, setValue]);
 
   useEffect(() => {
     if (id) {
@@ -419,7 +429,7 @@ export const PropertyFormPage = () => {
           price: propertyData.price,
           propertyType: propertyData.propertyType,
           status: propertyData.status,
-          advisorId: propertyData.advisorId,
+          advisorId: currentUser?.id ?? propertyData.advisorId,
           constructionArea: propertyData.constructionArea,
           landArea: propertyData.landArea,
           hasBasicServices: propertyData.hasBasicServices,
@@ -704,21 +714,21 @@ export const PropertyFormPage = () => {
     setValue("basicServices", newServices, { shouldValidate: false });
   };
 
-  // Memoize advisor options to prevent unnecessary re-calculations
+
+  // Todos los usuarios activos; si la lista no cargó, al menos el usuario logueado.
   const advisorOptions = useMemo(() => {
-    if (!advisors || advisors.length === 0) {
-      return (
-        <option value="" disabled>
-          No hay asesores disponibles
-        </option>
-      );
-    }
-    return advisors.map((advisor) => (
+    const list =
+      advisors.length > 0
+        ? advisors
+        : currentUser
+          ? [{ id: currentUser.id, firstName: currentUser.firstName, lastName: currentUser.lastName }]
+          : [];
+    return list.map((advisor) => (
       <option key={advisor.id} value={advisor.id}>
         {advisor.firstName} {advisor.lastName}
       </option>
     ));
-  }, [advisors]);
+  }, [advisors, currentUser]);
 
   const filteredClients = useMemo(() => {
     const q = clientSearch.toLowerCase();
@@ -817,7 +827,7 @@ export const PropertyFormPage = () => {
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => navigate("/admin/propiedades/gestion")}
+            onClick={() => window.history.length > 1 ? window.history.back() : navigate("/admin/propiedades/gestion")}
             className="p-2 hover:bg-gray-100 rounded-full"
           >
             <ArrowLeft size={20} />
@@ -842,7 +852,7 @@ export const PropertyFormPage = () => {
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => navigate("/admin/propiedades/gestion")}
+            onClick={() => window.history.length > 1 ? window.history.back() : navigate("/admin/propiedades/gestion")}
             className="p-2 hover:bg-gray-100 rounded-full"
           >
             <ArrowLeft size={20} />
@@ -870,7 +880,7 @@ export const PropertyFormPage = () => {
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex items-center gap-4 mb-6">
         <button
-          onClick={() => navigate("/admin/propiedades/gestion")}
+          onClick={() => window.history.length > 1 ? window.history.back() : navigate("/admin/propiedades/gestion")}
           className="p-2 hover:bg-gray-100 rounded-full"
         >
           <ArrowLeft size={20} />

@@ -22,12 +22,28 @@ import {
   Monitor,
   Check,
   Workflow,
+  ShieldCheck,
+  type LucideIcon,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import api, { getApiBaseUrl } from '../../services/api';
 import Swal from 'sweetalert2';
+import appVersion from '../../version.json';
 import { io, type Socket } from 'socket.io-client';
 import { OpenAiCreditBadge } from './OpenAiCreditBadge';
+
+const MENU_ICONS: Record<string, LucideIcon> = {
+  LayoutDashboard,
+  Users,
+  ShieldCheck,
+  UserCheck,
+  Building2,
+  Workflow,
+  FolderOpen,
+  ShieldX,
+  Settings,
+  Bell,
+};
 
 interface AppConfig {
   businessName: string | null;
@@ -44,7 +60,8 @@ interface NotificationItem {
 }
 
 export const AdminLayout = () => {
-  const { logout, user, token } = useAuth();
+  const { logout, user, token, canAccess, modules } = useAuth();
+  const canNotifications = canAccess('notifications');
   const { theme, resolvedTheme, setTheme, themeClass } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -100,7 +117,7 @@ export const AdminLayout = () => {
   };
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !canNotifications) return;
 
     const apiBase = getApiBaseUrl();
     // Remove trailing `/api` suffix if present so socket namespace lands on host root.
@@ -150,7 +167,7 @@ export const AdminLayout = () => {
     return () => {
       socket.disconnect();
     };
-  }, [navigate, token]);
+  }, [navigate, token, canNotifications]);
 
   // Fetch company configuration once on mount
   useEffect(() => {
@@ -171,9 +188,9 @@ export const AdminLayout = () => {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !canNotifications) return;
     fetchUnreadNotifications();
-  }, [token]);
+  }, [token, canNotifications]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -216,20 +233,15 @@ export const AdminLayout = () => {
     navigate('/admin/login');
   };
 
-  const menuItems = [
-    { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/admin/usuarios', icon: Users, label: 'Usuarios', allowed: ['ADMIN'] },
-    { path: '/admin/clientes', icon: UserCheck, label: 'Clientes' },
-    { path: '/admin/propiedades/gestion', icon: Building2, label: 'Propiedades' },
-    { path: '/admin/procesos', icon: Workflow, label: 'Procesos' },
-    { path: '/admin/archivos', icon: FolderOpen, label: 'Archivos' },
-    { path: '/admin/lista-negra', icon: ShieldX, label: 'Lista Negra' },
-    { path: '/admin/configuracion', icon: Settings, label: 'Configuración' },
-  ];
-
-  const filteredMenuItems = menuItems.filter(item => 
-    !item.allowed || item.allowed.includes(user?.type as string)
-  );
+  // Menú generado desde el catálogo de módulos: solo los marcados inMenu y a los que el perfil tiene acceso.
+  // El Dashboard siempre se muestra; sin acceso la página aparece bloqueada.
+  const filteredMenuItems = modules.filter(
+    (m) => m.inMenu && (m.key === 'dashboard' || canAccess(m.key)),
+  ).map((m) => ({
+    path: m.path,
+    icon: MENU_ICONS[m.icon] ?? LayoutDashboard,
+    label: m.label,
+  }));
 
   return (
     <div className={`flex h-screen bg-gray-50 ${themeClass}`}>
@@ -242,7 +254,7 @@ export const AdminLayout = () => {
       )}
 
       {/* Notifications Overlay */}
-      {notificationsOpen && (
+      {canNotifications && notificationsOpen && (
         <div
           className="fixed inset-0 bg-black/30 z-40"
           onClick={() => setNotificationsOpen(false)}
@@ -360,6 +372,13 @@ export const AdminLayout = () => {
               </div>
             )}
           </div>
+          <p
+            className={`mt-2 text-center text-[11px] leading-tight text-gray-400 ${
+              !isSidebarOpen && !isMobile ? 'hidden' : 'block'
+            }`}
+          >
+            v{appVersion.version} · By. EcuaDev
+          </p>
         </div>
       </aside>
 
@@ -455,17 +474,19 @@ export const AdminLayout = () => {
               )}
             </div>
 
-            <button
-              onClick={openNotifications}
-              className="relative p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors"
-            >
-              <Bell className="w-5 h-5 text-gray-600 dark:text-gray-200" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[10px] leading-5 font-bold text-center">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </button>
+            {canNotifications && (
+              <button
+                onClick={openNotifications}
+                className="relative p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors"
+              >
+                <Bell className="w-5 h-5 text-gray-600 dark:text-gray-200" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[10px] leading-5 font-bold text-center">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </header>
 
@@ -476,65 +497,67 @@ export const AdminLayout = () => {
       </div>
 
       {/* Notifications Sidebar */}
-      <aside
-        className={`dropdown-panel fixed right-0 top-0 h-full w-full sm:w-[420px] bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300 ${
-          notificationsOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="h-16 px-5 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">Notificaciones</h3>
-            <p className="text-xs text-gray-500">No leídas</p>
-          </div>
-          <button
-            onClick={() => setNotificationsOpen(false)}
-            className="p-2 rounded-lg hover:bg-gray-100"
-          >
-            <X className="w-5 h-5 text-gray-600" />
-          </button>
-        </div>
-
-        <div className="p-4 border-b border-gray-100">
-          <button
-            onClick={() => {
-              setNotificationsOpen(false);
-              navigate('/admin/notificaciones');
-            }}
-            className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-          >
-            <ExternalLink className="w-4 h-4" /> Ver todo
-          </button>
-        </div>
-
-        <div className="h-[calc(100%-8.5rem)] overflow-y-auto p-4 space-y-3">
-          {loadingUnread ? (
-            <p className="text-sm text-gray-500">Cargando notificaciones...</p>
-          ) : unreadNotifications.length === 0 ? (
-            <div className="text-center py-10 text-sm text-gray-500 border border-dashed rounded-lg">
-              No tienes notificaciones no leídas.
+      {canNotifications && (
+        <aside
+          className={`dropdown-panel fixed right-0 top-0 h-full w-full sm:w-[420px] bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300 ${
+            notificationsOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
+          <div className="h-16 px-5 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Notificaciones</h3>
+              <p className="text-xs text-gray-500">No leídas</p>
             </div>
-          ) : (
-            unreadNotifications.map((notification) => (
-              <button
-                key={notification.id}
-                onClick={() => handleNotificationClick(notification)}
-                className="w-full text-left rounded-xl border border-gray-200 bg-blue-50/40 hover:bg-blue-50 p-4 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900">{notification.title}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+            <button
+              onClick={() => setNotificationsOpen(false)}
+              className="p-2 rounded-lg hover:bg-gray-100"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+
+          <div className="p-4 border-b border-gray-100">
+            <button
+              onClick={() => {
+                setNotificationsOpen(false);
+                navigate('/admin/notificaciones');
+              }}
+              className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              <ExternalLink className="w-4 h-4" /> Ver todo
+            </button>
+          </div>
+
+          <div className="h-[calc(100%-8.5rem)] overflow-y-auto p-4 space-y-3">
+            {loadingUnread ? (
+              <p className="text-sm text-gray-500">Cargando notificaciones...</p>
+            ) : unreadNotifications.length === 0 ? (
+              <div className="text-center py-10 text-sm text-gray-500 border border-dashed rounded-lg">
+                No tienes notificaciones no leídas.
+              </div>
+            ) : (
+              unreadNotifications.map((notification) => (
+                <button
+                  key={notification.id}
+                  onClick={() => handleNotificationClick(notification)}
+                  className="w-full text-left rounded-xl border border-gray-200 bg-blue-50/40 hover:bg-blue-50 p-4 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900">{notification.title}</h4>
+                      <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                    </div>
+                    <span className="mt-1 inline-block w-2.5 h-2.5 rounded-full bg-blue-600" />
                   </div>
-                  <span className="mt-1 inline-block w-2.5 h-2.5 rounded-full bg-blue-600" />
-                </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  {new Date(notification.createdAt).toLocaleString('es-EC')}
-                </p>
-              </button>
-            ))
-          )}
-        </div>
-      </aside>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {new Date(notification.createdAt).toLocaleString('es-EC')}
+                  </p>
+                </button>
+              ))
+            )}
+          </div>
+        </aside>
+      )}
     </div>
   );
 };

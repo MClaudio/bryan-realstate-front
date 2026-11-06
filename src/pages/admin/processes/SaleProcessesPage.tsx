@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, ChevronRight, Pencil, RefreshCw, Search, Workflow } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, Pencil, RefreshCw, Search, Workflow } from "lucide-react";
 import api from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
 import { alertError } from "../../../utils/alerts";
 import { ProgressBar } from "../../../components/common/ProgressBar";
 import {
@@ -27,6 +28,7 @@ const matchesProgress = (p: number, f: ProgressFilter) =>
 
 /** Read-only view of where the process stands: the first pending step. */
 const CurrentStage = ({ process }: { process: SaleProcess }) => {
+  const { can } = useAuth();
   const applicable = process.stages.filter((s) => s.applies);
   const index = applicable.findIndex((s) => !s.completed);
   const current = index === -1 ? null : applicable[index];
@@ -102,18 +104,28 @@ const CurrentStage = ({ process }: { process: SaleProcess }) => {
         </div>
       )}
       <div className="flex justify-end">
-        <Link
-          to={`/admin/procesos/${process.propertyId}`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
-        >
-          <Pencil size={15} /> Editar proceso
-        </Link>
+        {can("processes", "edit") ? (
+          <Link
+            to={`/admin/procesos/${process.propertyId}`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
+          >
+            <Pencil size={15} /> Editar proceso
+          </Link>
+        ) : can("processes", "view") ? (
+          <Link
+            to={`/admin/procesos/${process.propertyId}`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold transition-colors"
+          >
+            <Eye size={15} /> Ver proceso
+          </Link>
+        ) : null}
       </div>
     </div>
   );
 };
 
 export const SaleProcessesPage = () => {
+  const { can } = useAuth();
   const [processes, setProcesses] = useState<SaleProcess[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -275,13 +287,16 @@ export const SaleProcessesPage = () => {
                       <StageDots process={p} />
                     </span>
                   </button>
-                  <Link
-                    to={`/admin/procesos/${p.propertyId}`}
-                    className="flex-none self-center mr-4 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:text-blue-700 hover:border-blue-300 transition-colors"
-                    title="Editar proceso"
-                  >
-                    <Pencil size={14} /> <span className="hidden sm:inline">Editar</span>
-                  </Link>
+                  {(can("processes", "edit") || can("processes", "view")) && (
+                    <Link
+                      to={`/admin/procesos/${p.propertyId}`}
+                      className="flex-none self-center mr-4 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:text-blue-700 hover:border-blue-300 transition-colors"
+                      title={can("processes", "edit") ? "Editar proceso" : "Ver proceso"}
+                    >
+                      {can("processes", "edit") ? <Pencil size={14} /> : <Eye size={14} />}{" "}
+                      <span className="hidden sm:inline">{can("processes", "edit") ? "Editar" : "Ver"}</span>
+                    </Link>
+                  )}
                 </div>
                 {open && (
                   <div className="px-5 lg:pl-16 py-5 bg-gray-50 border-t border-gray-200">

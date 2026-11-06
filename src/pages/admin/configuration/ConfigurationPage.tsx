@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Can } from '../../../components/common/Can';
 import { useForm } from 'react-hook-form';
 import api, { resolveFileUrl } from '../../../services/api';
 import { Save, Building, Phone, Mail, Globe, Upload } from 'lucide-react';
@@ -361,6 +362,7 @@ export const ConfigurationPage = () => {
         </div>
 
         <div className="flex justify-end mt-8 pt-6 border-t border-gray-200">
+          <Can module="configuration" action="edit">
           <button
             type="submit"
             disabled={loading}
@@ -376,6 +378,7 @@ export const ConfigurationPage = () => {
               'Guardar Configuración'
             )}
           </button>
+          </Can>
         </div>
       </form>
     </div>

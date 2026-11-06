@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../../services/api';
-import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, X, Heart, ImageIcon, ListChecks, Copy, FileText } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronLeft, ChevronRight, Download, BadgePercent, X, Heart, ImageIcon, ListChecks, Copy, FileText, Pencil } from 'lucide-react';
 import { toastError, toastSuccess } from '../../../utils/alerts';
+import { Can } from '../../../components/common/Can';
 import { ClientInfoModal, type ClientInterestContext } from '../../../components/clients/ClientInfoModal';
 import { PROPERTY_STATUS_LABELS, PROPERTY_TYPE_LABELS, ZONE_LABELS } from '../../../utils/propertyEnums';
 import { PropertyChecklistModal } from './PropertyChecklistModal';
 import { PropertyChecklistSummary } from './PropertyChecklistSummary';
 import { SaleProcessCard } from '../processes/SaleProcessCard';
 import { InterestedClientsSection } from './InterestedClientsSection';
+import { useAuth } from '../../../context/AuthContext';
 
 // ─── Image lightbox ──────────────────────────────────────────────────────────
 interface GalleryImage { id: string; url: string; name: string }
@@ -237,6 +239,8 @@ const InterestFormModal = ({
 };
 
 export const PropertyViewPage = () => {
+  const { can } = useAuth();
+  const canViewClients = can('clients', 'view');
   const [infoClient, setInfoClient] = useState<{ clientId: string; interest?: ClientInterestContext } | null>(null);
   const { id } = useParams();
   const location = useLocation();
@@ -493,6 +497,7 @@ export const PropertyViewPage = () => {
           <h1 className="text-2xl font-bold text-gray-800">Propiedad {property.code}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Can module="properties" action="print">
           <button
             onClick={() => {
               setProposalClientId(null);
@@ -506,12 +511,21 @@ export const PropertyViewPage = () => {
           >
             <FileText size={16} /> {generatingProposal ? 'Generando...' : 'Propuesta PDF'}
           </button>
+          </Can>
           <button
             onClick={() => setShowChecklist(true)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
           >
             <ListChecks size={16} /> Checklist
           </button>
+          <Can module="properties" action="edit">
+            <Link
+              to={`/admin/propiedades/editar/${id}`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+            >
+              <Pencil size={16} /> Editar
+            </Link>
+          </Can>
         </div>
       </div>
 
@@ -686,7 +700,15 @@ export const PropertyViewPage = () => {
             )}
 
             {/* ── Clientes Interesados (registrados + recomendados) ─ */}
-            {id && (
+            {id && !canViewClients && (
+              <div className="mt-6">
+                <h3 className="text-lg font-medium flex items-center gap-2 mb-2">
+                  <Heart size={18} className="text-pink-500" /> Clientes Interesados
+                </h3>
+                <p className="text-sm text-gray-600">No tienes acceso a ver a los clientes.</p>
+              </div>
+            )}
+            {id && canViewClients && (
               <InterestedClientsSection
                 propertyId={id}
                 interests={interests}
@@ -721,9 +743,11 @@ export const PropertyViewPage = () => {
                   {documents.map((d) => (
                     <div key={d.id} className="flex items-center justify-between">
                       <span className="text-sm text-gray-700 truncate">{d.name}</span>
-                      <a href={d.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-2 py-1 text-sm border rounded hover:bg-gray-100">
-                        <Download size={16} /> Descargar
-                      </a>
+                      <Can module="properties" action="download">
+                        <a href={d.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-2 py-1 text-sm border rounded hover:bg-gray-100">
+                          <Download size={16} /> Descargar
+                        </a>
+                      </Can>
                     </div>
                   ))}
                 </div>

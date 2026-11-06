@@ -201,6 +201,8 @@ const clearStoredSession = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
+  localStorage.removeItem('profile');
+  localStorage.removeItem('modules');
   sessionStorage.removeItem('token');
   sessionStorage.removeItem('refresh_token');
   sessionStorage.removeItem('user');

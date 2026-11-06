@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import api, { resolveFileUrl } from "../../../services/api";
+import { Can } from '../../../components/common/Can';
 import { Link, useNavigate } from "react-router-dom";
 import {
   alertConfirm,
@@ -214,22 +215,26 @@ export const PropertiesManagementPage = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSyncRecommendations}
-            disabled={syncingRecommendations}
-            className="border border-blue-200 bg-white hover:bg-blue-50 text-blue-700 px-4 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 disabled:opacity-60"
-            title="Lee lo que busca cada cliente y recalcula los clientes recomendados de todas las propiedades"
-          >
-            <Sparkles size={18} />
-            {syncingRecommendations ? "Iniciando..." : "Sincronizar recomendaciones"}
-          </button>
-          <Link
-            to="/admin/propiedades/nueva"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
-          >
-            <Plus size={20} /> Nueva Propiedad
-          </Link>
+          <Can module="properties" action="edit">
+            <button
+              type="button"
+              onClick={handleSyncRecommendations}
+              disabled={syncingRecommendations}
+              className="border border-blue-200 bg-white hover:bg-blue-50 text-blue-700 px-4 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 disabled:opacity-60"
+              title="Lee lo que busca cada cliente y recalcula los clientes recomendados de todas las propiedades"
+            >
+              <Sparkles size={18} />
+              {syncingRecommendations ? "Iniciando..." : "Sincronizar recomendaciones"}
+            </button>
+          </Can>
+          <Can module="properties" action="create">
+            <Link
+              to="/admin/propiedades/nueva"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
+            >
+              <Plus size={20} /> Nueva Propiedad
+            </Link>
+          </Can>
         </div>
       </div>
 
@@ -479,13 +484,15 @@ export const PropertiesManagementPage = () => {
                   </div> */}
 
                   <div className="flex items-center gap-2">
-                    <Link
-                      to={`/admin/propiedades/ver/${property.id}`}
-                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                      title="Ver detalles"
-                    >
-                      <Eye size={16} />
-                    </Link>
+                    <Can module="properties" action="view">
+                      <Link
+                        to={`/admin/propiedades/ver/${property.id}`}
+                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Ver detalles"
+                      >
+                        <Eye size={16} />
+                      </Link>
+                    </Can>
                     <button
                       className="p-2 text-gray-400 hover:text-emerald-600 transition-colors"
                       title="Checklist"
@@ -493,20 +500,24 @@ export const PropertiesManagementPage = () => {
                     >
                       <ListChecks size={16} />
                     </button>
-                    <Link
-                      to={`/admin/propiedades/editar/${property.id}`}
-                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                      title="Editar"
-                    >
-                      <Edit size={16} />
-                    </Link>
-                    <button
-                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                      title="Eliminar"
-                      onClick={() => handleDelete(property.id)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <Can module="properties" action="edit">
+                      <Link
+                        to={`/admin/propiedades/editar/${property.id}`}
+                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Editar"
+                      >
+                        <Edit size={16} />
+                      </Link>
+                    </Can>
+                    <Can module="properties" action="delete">
+                      <button
+                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                        title="Eliminar"
+                        onClick={() => handleDelete(property.id)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </Can>
                   </div>
                 </div>
               </div>

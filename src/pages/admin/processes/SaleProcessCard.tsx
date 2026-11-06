@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Loader2, Workflow } from "lucide-react";
 import api from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
 import { ProgressBar } from "../../../components/common/ProgressBar";
 import {
   PAYMENT_METHOD_BADGE,
@@ -29,22 +30,27 @@ const detailOf = (s: SaleProcessStage) => {
 /** Read-only sale-process summary for the property detail page. */
 export const SaleProcessCard = ({ propertyId }: { propertyId: string }) => {
   const [process, setProcess] = useState<SaleProcess | null>(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<"" | "forbidden" | "failed">("");
+  const { can } = useAuth();
+  const canView = can("processes", "view");
+  const canEdit = can("processes", "edit");
 
   useEffect(() => {
+    // Sin permiso de ver no se consulta el proceso (la API respondería 403).
+    if (!canView) return;
     let cancelled = false;
     api
       .get(`/sale-processes/${propertyId}`)
       .then((res) => {
         if (!cancelled) setProcess(res.data);
       })
-      .catch(() => {
-        if (!cancelled) setError(true);
+      .catch((err) => {
+        if (!cancelled) setError(err?.response?.status === 403 ? "forbidden" : "failed");
       });
     return () => {
       cancelled = true;
     };
-  }, [propertyId]);
+  }, [propertyId, canView]);
 
   return (
     <div className="mt-6">
@@ -59,15 +65,19 @@ export const SaleProcessCard = ({ propertyId }: { propertyId: string }) => {
             </span>
           )}
         </h3>
-        <Link
-          to={`/admin/procesos/${propertyId}`}
-          className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
-        >
-          Editar proceso <ArrowRight size={15} />
-        </Link>
+        {canView && (
+          <Link
+            to={`/admin/procesos/${propertyId}`}
+            className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
+          >
+            {canEdit ? "Editar proceso" : "Ver proceso"} <ArrowRight size={15} />
+          </Link>
+        )}
       </div>
 
-      {error ? (
+      {!canView || error === "forbidden" ? (
+        <p className="text-sm text-gray-600">No tienes acceso a ver el proceso.</p>
+      ) : error ? (
         <p className="text-sm text-red-600">No se pudo cargar el proceso.</p>
       ) : !process ? (
         <div className="flex justify-center py-6">
