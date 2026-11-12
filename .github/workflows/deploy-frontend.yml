@@ -1,4 +1,4 @@
-name: Build and Deploy Frontend
+name: Build and Deploy Frontend to Dokploy
 
 on:
   push:
@@ -49,16 +49,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trigger EasyPanel deployment
+      - name: Trigger Dokploy deployment
+        env:
+          DEPLOY_WEBHOOK: ${{ secrets.EASYPANEL_DEPLOY_FRONTEND_WEBHOOK }}
         run: |
-          echo "Triggering EasyPanel frontend deployment (pull image only, no build)..."
-          response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.EASYPANEL_DEPLOY_FRONTEND_WEBHOOK }}")
-          http_code="${response: -3}"
+          if [ -z "$DEPLOY_WEBHOOK" ]; then
+            echo "::error::El secret EASYPANEL_DEPLOY_FRONTEND_WEBHOOK no está configurado."
+            exit 1
+          fi
+          echo "Triggering Dokploy frontend deployment (pull image only, no build)..."
+          body_file=$(mktemp)
+          http_code=$(curl -s -o "$body_file" -D "$body_file.headers" -w "%{http_code}" -X POST "$DEPLOY_WEBHOOK")
           if [ "$http_code" = "200" ] || [ "$http_code" = "201" ] || [ "$http_code" = "204" ]; then
             echo "Deployment webhook triggered successfully (HTTP $http_code)"
           else
             echo "Deployment webhook failed (HTTP $http_code)"
-            echo "Response: ${response%???}"
+            if grep -qi '^cf-mitigated: challenge' "$body_file.headers"; then
+              echo "::error::Cloudflare respondió con un challenge (bot protection) al runner de GitHub. Crea una regla de WAF 'Skip' para la ruta /api/deploy/* en la zona dockploy.ecuadev.com (o ecuadev.com)."
+            fi
+            head -c 300 "$body_file"; echo
             exit 1
           fi
 
