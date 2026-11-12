@@ -46,22 +46,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trigger EasyPanel test deployment (optional)
+      - name: Trigger Dokploy test deployment (optional)
         env:
-          TEST_WEBHOOK: ${{ secrets.EASYPANEL_DEPLOY_FRONTEND_TEST_WEBHOOK }}
+          DEPLOY_WEBHOOK: ${{ secrets.EASYPANEL_DEPLOY_FRONTEND_TEST_WEBHOOK }}
         run: |
-          if [ -z "$TEST_WEBHOOK" ]; then
+          if [ -z "$DEPLOY_WEBHOOK" ]; then
             echo "EASYPANEL_DEPLOY_FRONTEND_TEST_WEBHOOK no está configurado, se omite este paso."
             exit 0
           fi
-          echo "Triggering EasyPanel TEST frontend deployment (pull image only, no build)..."
-          response=$(curl -s -w "%{http_code}" -X POST "$TEST_WEBHOOK")
-          http_code="${response: -3}"
+          echo "Triggering Dokploy TEST frontend deployment (pull image only, no build)..."
+          body_file=$(mktemp)
+          http_code=$(curl -s -o "$body_file" -D "$body_file.headers" -w "%{http_code}" -X POST "$DEPLOY_WEBHOOK")
           if [ "$http_code" = "200" ] || [ "$http_code" = "201" ] || [ "$http_code" = "204" ]; then
             echo "Deployment webhook triggered successfully (HTTP $http_code)"
           else
             echo "Deployment webhook failed (HTTP $http_code)"
-            echo "Response: ${response%???}"
+            if grep -qi '^cf-mitigated: challenge' "$body_file.headers"; then
+              echo "::error::Cloudflare respondió con un challenge (bot protection) al runner de GitHub. Revisa el DNS del host del webhook de test (DNS only) o una regla de WAF para /api/deploy/*."
+            fi
+            head -c 300 "$body_file"; echo
             exit 1
           fi
 
